@@ -20,7 +20,7 @@ template<
 	unsigned N, // index 
 	unsigned End, // end after
 	typename Arg, // check type
-	bool is_mysql_type = kIsMysqlType<Arg>> // check type whether mysql required type
+	bool is_mysql_type = IsMysqlType<Arg>::value> // check type whether mysql required type
 struct BindInputsImpl;
 
 // exit template recursion
@@ -78,7 +78,8 @@ struct BindInputsImpl<N, End, std::string, true>  {
 	static void Apply(MysqlBindVector& parameters, std::string& str, Args&... args){
 		auto& parameter = parameters.at(N);
 		parameter.buffer_type = TypeMap(TypeIdentity<std::string>{});
-		parameter.buffer = str.data();
+		//before C++17, std::string::data return char const*
+		parameter.buffer = const_cast<char*>(str.data());
 		parameter.buffer_length = str.size(); //O(1) so not just forward to specialization of char*
 		parameter.length = &parameter.buffer_length;
 		parameter.is_null = NULL;

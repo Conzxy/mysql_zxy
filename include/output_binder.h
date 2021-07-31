@@ -34,7 +34,7 @@ void BindOutputParameters(
 
 template<
 	typename Arg, 
-	bool is_mysql_type = kIsMysqlType<Arg>>
+	bool is_mysql_type = IsMysqlType<Arg>::value>
 struct OutputBinder;
 
 // not mysql required type
@@ -157,7 +157,7 @@ void BindOutputParameters(
 
 char const kNullErrorMessage[] = "null value is only allowed to present by smart pointer";
 
-// no need to kIsMysqlType
+// no need to IsMysqlType
 // because call TupleSetter after BindOutputParameters()
 template<typename ...Args>
 void TupleSetter(TinySTL::Tuple<Args...>& tuple, MysqlBindVector& binds);
@@ -176,7 +176,7 @@ void TupleSetterImpl(type<T>& arg, MYSQL_BIND& bind){ \
 	if(*bind.is_null) \
 		arg.reset(nullptr); \
 	else \
-		arg = type(new T(*reinterpret_cast<T*>(bind.buffer))); \
+		arg.reset(new T(*reinterpret_cast<T*>(bind.buffer))); \
 }
 
 WRAPPER_OF_TUPLESETTER_FULL_SPECIALIZATION(std::unique_ptr)

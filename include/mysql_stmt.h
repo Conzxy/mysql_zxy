@@ -4,12 +4,17 @@
 #include "util/noncopyable.h"
 #include <mysql/mysql.h>
 #include "mysql_exception.h"
+#include <utility>
 #include <string.h>
 #include <string>
 
 namespace zxy {
 
 class PreparedStmt : noncopyable {
+public:
+	using MysqlStmtParameteCount = unsigned long;
+	using MysqlStmtFieldCount = unsigned int;
+
 public:
 	PreparedStmt(MYSQL* connection, char const* query)
 		: stmt_(mysql_stmt_init(connection))
@@ -36,6 +41,9 @@ public:
 	//just print error message to stderr
 	//destructor must don't throw exception
 	~PreparedStmt(){
+		if(!stmt_)
+			return ;
+
 		if(mysql_stmt_free_result(stmt_) != 0){
 			perror("failed in mysql_stmt_free_result(destructor)");
 		}
@@ -43,15 +51,33 @@ public:
 		if(mysql_stmt_close(stmt_) != 0)
 			perror("failed in mysql_stmt_close(destructor)");
 	}
+	
+	PreparedStmt(PreparedStmt&& rhs) noexcept
+		: stmt_(rhs.stmt_)
+		, parameter_count_(rhs.parameter_count_)
+		, field_count_(rhs.field_count_)
+	{ rhs.stmt_ = nullptr; }
 
-	auto parameter_count() const noexcept { return parameter_count_; }
-	auto field_count() const noexcept { return field_count_; }
-	auto stmt() const noexcept { return stmt_; }
+	PreparedStmt& operator= (PreparedStmt&& rhs) noexcept {
+		this->swap(rhs);
+		return *this;
+	}
+
+	MysqlStmtParameteCount parameter_count() const noexcept { return parameter_count_; }
+	MysqlStmtFieldCount field_count() const noexcept { return field_count_; }
+	MYSQL_STMT* stmt() const noexcept { return stmt_; }
+
+	void swap(PreparedStmt& rhs) noexcept{
+		std::swap(stmt_, rhs.stmt_);	
+		std::swap(parameter_count_, rhs.parameter_count_);
+		std::swap(field_count_, rhs.field_count_);
+	}
+
 private:
 	MYSQL_STMT* stmt_;
 
-	unsigned long parameter_count_;
-	unsigned int field_count_;
+	MysqlStmtParameteCount parameter_count_;
+	MysqlStmtFieldCount field_count_;
 };
 
 } // namespacec zxy

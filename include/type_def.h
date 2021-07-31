@@ -6,7 +6,6 @@
 #include <deque>
 #include <mysql/mysql.h>
 #include "tuple.h"
-#include "stl_utility.h"
 
 namespace zxy{
 

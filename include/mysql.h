@@ -4,7 +4,6 @@
 #include <mysql/my_command.h>
 #include <mysql/mysql.h>
 #include "helper.h"
-#include "stl_utility.h"
 #include "util/noncopyable.h"
 #include "mysql_exception.h"
 #include "mysql_stmt.h"

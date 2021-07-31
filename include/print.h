@@ -2,14 +2,14 @@
 #define _ZXY_MYSQL_PRINT_H
 
 #include "tuple.h"
+#include "type_def.h"
 
 namespace zxy{
 
 template<
 	typename Ostream, 
-	template<typename > class C,
 	typename ...Args>
-Ostream& operator<<(Ostream& os, C<TinySTL::Tuple<Args...>> const& tuples){
+Ostream& operator<<(Ostream& os, TupleVector<Args...> const& tuples){
 	for(int i = 0; i != tuples.size(); ++i)
 		os << tuples[i] << '\n';
 

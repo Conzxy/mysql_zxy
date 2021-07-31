@@ -4,7 +4,7 @@
 namespace zxy{
 
 struct noncopyable{
-#if __cplusplus > 201103L
+#if __cplusplus >= 201103L
 		noncopyable() = default;
 		noncopyable(noncopyable const&) = delete;
 		noncopyable& operator=(noncopyable const&) = delete;
