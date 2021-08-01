@@ -77,7 +77,19 @@ struct OutputBinder<std::string, true>{
 	}
 };
 
-//other type
+template<unsigned SZ>
+struct OutputBinder<char[SZ], true>{
+	static void Apply(MYSQL_BIND& bind, MysqlBuffer& buffer, bool& is_null){
+		bind.buffer_type = MYSQL_TYPE_VAR_STRING;
+		if(buffer.size() == 0)
+			buffer.resize(SZ);
+		bind.buffer = buffer.data();
+		bind.buffer_length = buffer.size();
+		bind.is_null = &is_null;
+	}
+};
+
+// other type
 template<typename Arg>
 struct OutputBinder<Arg, true>{
 	static void Apply(MYSQL_BIND& bind, MysqlBuffer&  buffer, bool& is_null){

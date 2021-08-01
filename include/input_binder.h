@@ -7,6 +7,7 @@
 #include "type_traits.h"
 #include "typelist.h"
 #include "stl_move.h"
+#include <string.h>
 
 namespace zxy{
 
@@ -121,18 +122,34 @@ struct BindInputsImpl<N, End, char[SZ], true>{
 	}
 };
 
+#define BINDINPUTSIMPL_BLOB_SPECIALIZATION(type) \
+template<unsigned N, unsigned End>\
+struct BindInputsImpl<N, End, type, true>{\
+	template<typename ...Args>\
+	static void Apply(MysqlBindVector& parameters, type& blob, Args& ...args){\
+		BindInputsImpl<N, End, decltype(blob.data)>::Apply(parameters, blob, args...);\
+	}\
+};
+
+BINDINPUTSIMPL_BLOB_SPECIALIZATION(TinyBlob)
+BINDINPUTSIMPL_BLOB_SPECIALIZATION(Blob)
+BINDINPUTSIMPL_BLOB_SPECIALIZATION(MediumBlob)
+BINDINPUTSIMPL_BLOB_SPECIALIZATION(LongBlob)
+
 // common cases
 // integers and float pointing
+// time
 template<unsigned N, unsigned End, typename Arg> 
 struct BindInputsImpl<N, End, Arg, true>{
 	template<typename ...Args>
 	static void Apply(MysqlBindVector& parameters, Arg& arg, Args&... args){
 		auto& parameter = parameters.at(N);
 		parameter.buffer_type = TypeMap(TypeIdentity<Arg>{});
-		parameter.buffer = &arg;
+		parameter.buffer = static_cast<void*>(&arg);
 		parameter.is_null = NULL;
 		parameter.is_unsigned = TinySTL::Is_unsigned<Arg>::value;
-
+		// buffer_length and length don't need to set explicitly
+		
 		using Next = typename Conditional_t<sizeof...(Args), 
 			  FrontT<Typelist<Args...>>,
 			  TypeIdentity<int>
