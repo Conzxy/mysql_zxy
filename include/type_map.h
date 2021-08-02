@@ -60,64 +60,15 @@ REGISTER_TYPE(LongBlob, MYSQL_TYPE_LONG_BLOB)
 
 using TinySTL::_true_type;
 using TinySTL::_false_type;
+using TinySTL::Void_t;
 
-#if __cplusplus >= 201402L
-template<typename T>
-constexpr bool IsMysqlType_v = false;
-
-#define IsMysqlType_ARRAY_SPECILIZATION(type) \
-template<unsigned N>  \
-constexpr bool IsMysqlType_v<type[N]> = true; 
-
-#define IsMysqlType_FULL_SPECILIZATION(type) \
-template<> \
-constexpr bool IsMysqlType_v<type> = true; 
-#else // c++11
-
-template<typename T>
+// use SFINAE partial specialization detect given type if registered type
+template<typename T, typename = void>
 struct IsMysqlType : _false_type {};
 
-#define IsMysqlType_ARRAY_SPECILIZATION(type) \
-template<unsigned N> \
-struct IsMysqlType<type[N]> : _true_type {};
-
-#define IsMysqlType_FULL_SPECILIZATION(type) \
-template<> \
-struct IsMysqlType<type> : _true_type {};
-
-#endif // __cplusplus >= 201402L
-
-IsMysqlType_ARRAY_SPECILIZATION(char)
-IsMysqlType_ARRAY_SPECILIZATION(char const)
-
-IsMysqlType_FULL_SPECILIZATION(char)
-IsMysqlType_FULL_SPECILIZATION(unsigned char)
-IsMysqlType_FULL_SPECILIZATION(short)
-IsMysqlType_FULL_SPECILIZATION(unsigned short)
-IsMysqlType_FULL_SPECILIZATION(int)
-IsMysqlType_FULL_SPECILIZATION(unsigned int)
-IsMysqlType_FULL_SPECILIZATION(int64_t)
-IsMysqlType_FULL_SPECILIZATION(uint64_t)
-IsMysqlType_FULL_SPECILIZATION(long long)
-IsMysqlType_FULL_SPECILIZATION(unsigned long long)
-IsMysqlType_FULL_SPECILIZATION(std::string)
-IsMysqlType_FULL_SPECILIZATION(char*)
-IsMysqlType_FULL_SPECILIZATION(char const*)
-IsMysqlType_FULL_SPECILIZATION(float)
-IsMysqlType_FULL_SPECILIZATION(double)
-IsMysqlType_FULL_SPECILIZATION(Date)
-IsMysqlType_FULL_SPECILIZATION(DateTime)
-IsMysqlType_FULL_SPECILIZATION(Timestamp)
-IsMysqlType_FULL_SPECILIZATION(Time)
-IsMysqlType_FULL_SPECILIZATION(Blob)
-IsMysqlType_FULL_SPECILIZATION(TinyBlob)
-IsMysqlType_FULL_SPECILIZATION(MediumBlob)
-IsMysqlType_FULL_SPECILIZATION(LongBlob)
-
-#if __cplusplus >= 201402L
-	template<typename T>
-	using IsMysqlType = TinySTL::Bool_constant<IsMysqlType_v<T>>;
-#endif
+template<typename T>
+struct IsMysqlType<T, Void_t<decltype(TypeMap(TypeIdentity<T>{}))>> 
+	: _true_type {};
 
 } //namespace zxy
 
