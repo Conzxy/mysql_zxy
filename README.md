@@ -9,7 +9,7 @@ Use the Mysql class to build connection to mysql server
 Mysql mysql(host, user, password, db)
 //port default is 3306
 ```
-Resource holding class use RAII technique, so user no need explicitly to destroy them.
+Resource holding class use RAII technique, so user no need to destroy them explicitly.
 
 ## type deduction
 ### Modification
@@ -74,7 +74,9 @@ It ensure SQL injection safe:
 
 ```cpp
 TupleVector<string, string, string ,double> results;
-mysql.RunQuery(results, "select * from instructor where id = ?", "1; drop table instructor");
+mysql.RunQuery(results, "select * from instructor where id = ?", 
+				"-1/**/Or/**/If((1/**/in/**/(1)),SIEEp(20),1)#");
+				
 assert(results.size() == 0);	
 ```
 
