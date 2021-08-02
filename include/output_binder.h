@@ -21,12 +21,15 @@ void SetResultset(
 		TupleVector<Args...>& tuples,
 		PreparedStmt const& stmt);
 
+using TinySTL::Tuple;
+using TinySTL::Get;
+
 namespace detail{
 
 /////////////////////////////
 // Output Parameters Binder
 /////////////////////////////
-void BindOutputParameters(
+void BindOutput(
 		MysqlBindVector& binds,
 		MysqlBufferVector& buffers,
 		std::vector<bool>& is_nulls);
@@ -125,42 +128,40 @@ struct OutputBinder<type<Arg>, false>{ \
 WRAPPER_OF_OUTPUT_BINDER_FULL_SPECIALIZATION(std::unique_ptr)
 WRAPPER_OF_OUTPUT_BINDER_FULL_SPECIALIZATION(std::shared_ptr)
 
-using namespace TinySTL::mpl; //Typelist
-using namespace TinySTL::mpl::TL; //related algorithm of Typelist
-
-template<int N>
-struct IntCounter{};
-
-template<typename T>
-void BindOutputParameters(
-		MysqlBindVector&,
-		MysqlBufferVector&,
-		MysqlIsNullVector&,
-		IntCounter<-1>)
-{ }
-
-template<typename Types, int N>
-void BindOutputParameters(
-		MysqlBindVector& binds, 
-		MysqlBufferVector& buffers, 
-		MysqlIsNullVector& is_nulls,
-		IntCounter<N>){
+using TinySTL::mpl::Typelist; //Typelist
+using TinySTL::mpl::Valuelist;
+using TinySTL::mpl::TL::Make_IndexList;
+using TinySTL::mpl::TL::Type_At;
+using TinySTL::mpl::int_;
 		
-	OutputBinder<Type_At<Types, N>>::Apply(binds.at(N), buffers.at(N), is_nulls.at(N));
-	BindOutputParameters<Types>(binds, buffers, is_nulls, IntCounter<N-1>{});
+template<typename TL, int_... Indices>
+void BindOutputImpl(
+		MysqlBindVector& binds,
+		MysqlBufferVector& buffers,
+		MysqlIsNullVector& is_nulls,
+		Valuelist<int_, Indices...>)
+{ 
+	int dummy[] = { ((OutputBinder<
+				Type_At<TL, Indices>
+				>::
+				Apply(binds[Indices], 
+				buffers[Indices], 
+				is_nulls[Indices])), 0)... };
 }
 
 template<typename ...Args>
-void BindOutputParameters(
+void BindOutput(
 		MysqlBindVector& binds,
 		MysqlBufferVector& buffers,
-		MysqlIsNullVector& is_nulls){
-
+		MysqlIsNullVector& is_nulls)
+{
 	assert(binds.size() == buffers.size());
 	assert(binds.size() == is_nulls.size());
 	assert(buffers.size() == is_nulls.size());
-
-	BindOutputParameters<Typelist<Args...>>(binds, buffers, is_nulls, IntCounter<sizeof...(Args)-1>{});
+	
+	BindOutputImpl<Typelist<Args...>>(
+			binds, buffers, is_nulls, 
+			Make_IndexList<sizeof...(Args)>{});
 }
 
 ///////////////////////////////
@@ -170,12 +171,12 @@ void BindOutputParameters(
 char const kNullErrorMessage[] = "null value is only allowed to present by smart pointer";
 
 // no need to IsMysqlType
-// because call TupleSetter after BindOutputParameters()
+// because call TupleSetter after BindOutput()
 template<typename ...Args>
 void TupleSetter(TinySTL::Tuple<Args...>& tuple, MysqlBindVector& binds);
 
 template<typename Arg>
-void TupleSetterImpl(Arg& arg, MYSQL_BIND& bind){
+void TupleSetter(Arg& arg, MYSQL_BIND& bind){
 	if(*bind.is_null)
 		throw MysqlException{kNullErrorMessage};
 
@@ -184,7 +185,7 @@ void TupleSetterImpl(Arg& arg, MYSQL_BIND& bind){
 
 #define WRAPPER_OF_TUPLESETTER_FULL_SPECIALIZATION(type) \
 template<typename T> \
-void TupleSetterImpl(type<T>& arg, MYSQL_BIND& bind){ \
+void TupleSetter(type<T>& arg, MYSQL_BIND& bind){ \
 	if(*bind.is_null) \
 		arg.reset(); \
 	else \
@@ -195,31 +196,32 @@ WRAPPER_OF_TUPLESETTER_FULL_SPECIALIZATION(std::unique_ptr)
 WRAPPER_OF_TUPLESETTER_FULL_SPECIALIZATION(std::shared_ptr)
 
 template<>
-inline void TupleSetterImpl<std::string>(std::string& str, MYSQL_BIND& bind){
+inline void TupleSetter<std::string>(std::string& str, MYSQL_BIND& bind){
 	if(*bind.is_null)
 		throw MysqlException{kNullErrorMessage};
 
 	str = reinterpret_cast<char*>(bind.buffer);
 }
 
-
-template<typename ...Args>
-void TupleSetter(TinySTL::Tuple<Args...>& , MysqlBindVector& , IntCounter<-1>)
-{ }
-
-template<typename ...Args, int N>
-void TupleSetter(TinySTL::Tuple<Args...>& tuple, MysqlBindVector& binds, IntCounter<N>){
-	//TinySTL::for_each(tuple, TupleSetterImpl);	
-	TupleSetterImpl(TinySTL::Get<N>(tuple), binds.at(N));	
-	TupleSetter(tuple, binds, IntCounter<N-1>{});
+template<typename ...Args, int_ ...Indices>
+void SetTupleImpl(
+		TinySTL::Tuple<Args...>& tuple, 
+		MysqlBindVector& binds,
+		Valuelist<int_, Indices...>)
+{
+	int dummy[] = { (TupleSetter(Get<Indices>(tuple), binds[Indices]), 0)... };
 }
 
 template<typename ...Args>
-void TupleSetter(TinySTL::Tuple<Args...>& tuple, MysqlBindVector& binds){
-	TupleSetter(tuple, binds, IntCounter<sizeof...(Args)-1>{});
+void SetTuple(
+		TinySTL::Tuple<Args...>& tuple, 
+		MysqlBindVector& binds)
+{
+	SetTupleImpl(tuple, binds, Make_IndexList<sizeof...(Args)>{});
 }
 
 } // namespace detail
+
 
 template<typename ...Args>
 void SetResultset(TupleVector<Args...>& tuples, PreparedStmt const& stmt){
@@ -229,7 +231,7 @@ void SetResultset(TupleVector<Args...>& tuples, PreparedStmt const& stmt){
 	MysqlBufferVector buffers(stmt.field_count());
 	MysqlIsNullVector is_nulls(stmt.field_count());
 	
-	detail::BindOutputParameters<Args...>(binds, buffers, is_nulls);
+	detail::BindOutput<Args...>(binds, buffers, is_nulls);
 	helper::BindResultAndExec(stmt, binds);
 	auto fetchret = helper::Fetch(stmt);
 
@@ -244,9 +246,9 @@ void SetResultset(TupleVector<Args...>& tuples, PreparedStmt const& stmt){
 		if(fetchret == MYSQL_NO_DATA)
 			break;
 
-		TinySTL::Tuple<Args...> row{};
+		Tuple<Args...> row{};
 
-		detail::TupleSetter(row, binds);
+		detail::SetTuple(row, binds);
 		tuples.emplace_back(std::move(row));	
 		
 		fetchret = helper::Fetch(stmt);
