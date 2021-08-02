@@ -21,9 +21,6 @@ void SetResultset(
 		TupleVector<Args...>& tuples,
 		PreparedStmt const& stmt);
 
-using TinySTL::Tuple;
-using TinySTL::Get;
-
 namespace detail{
 
 /////////////////////////////
@@ -143,8 +140,8 @@ void BindOutputImpl(
 { 
 	int dummy[] = { ((OutputBinder<
 				Type_At<TL, Indices>
-				>::
-				Apply(binds[Indices], 
+				>::Apply(
+				binds[Indices], 
 				buffers[Indices], 
 				is_nulls[Indices])), 0)... };
 }

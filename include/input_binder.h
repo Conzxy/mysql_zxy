@@ -12,8 +12,8 @@
 namespace zxy{
 
 using TinySTL::Conditional_t;
-using namespace TinySTL::mpl;
-using namespace TinySTL::mpl::TL;
+using TinySTL::mpl::Typelist;
+using TinySTL::mpl::TL::FrontT;
 
 template<typename ...Args>
 void BindInputs(MysqlBindVector& parameters, Args&... args);

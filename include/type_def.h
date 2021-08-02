@@ -93,7 +93,11 @@ using MysqlCol = unsigned int;
 using MysqlBuffer = std::vector<char>;
 
 using MysqlBindVector = std::vector<MYSQL_BIND>;
-template<typename ...Args> using TupleVector = std::vector<TinySTL::Tuple<Args...>>;
+
+using TinySTL::Tuple;
+using TinySTL::Get;
+
+template<typename ...Args> using TupleVector = std::vector<Tuple<Args...>>;
 using MysqlBufferVector = std::vector<MysqlBuffer>;
 using MysqlIsNullVector = std::deque<bool>; //std::vector<bool> is not a real container
 using MysqlOffVector = std::vector<MysqlOff>;
