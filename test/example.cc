@@ -11,9 +11,11 @@ using namespace std;
 using namespace zxy;
 
 int main(){
-		std::string password;
-		cout << "Please type your password: ";
-		cin >> password;
+
+	std::string password;
+	cout << "Please type your password: ";
+	cin >> password;
+
 	try{
 		Mysql mysql(NULL , "conzxy", password.c_str(), "zxy_mysql");
 
