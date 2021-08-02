@@ -1,19 +1,32 @@
 # mysql_zxy
 This is a simple and convenient mysql interface written in C++11.
 
-It supports type deduction and it's type safe.
+It supports **type deduction** and it's **type safe**.
+
+## init
+Use the Mysql class to build connection to mysql server
+```cpp
+Mysql mysql(host, user, password, db)
+//port default is 3306
+```
+Resource holding class use RAII technique, so user no need explicitly to destroy them.
 
 ## type deduction
-Modification supports bind variadic input parameters:
+### Modification
+Supports bind variadic input parameters:
 ```cpp
+// You should get prepared statement throught GetPreparedStmt()
 PreparedStmt insert_stmt = mysql.GetPreparedStmt(
 		"insert into instructor (ID, name, dept_name, salary) values"
 		"(?, ?, ?, ?)"
 		);
 
-mysql.RunModification(insert_stmt, IDs[i], names[i], dept_names[i], salarys[i]);
+for(int i = 0; i < SIZE; ++i){
+	mysql.RunModification(insert_stmt, IDs[i], names[i], dept_names[i], salarys[i]);
+}
 ```
-Query also supports bind variadic output parameters and input paramters:
+### Query
+Also supports input paramters:
 ```cpp
 TupleVector<string, string, string, double> tests;
 
@@ -27,7 +40,7 @@ cout << "Select tuple while salary = 80000 fron instructor\n";
 cout << tests;
 ```
 ### handle null value
-You should use smart pointer(such as std::unique_ptr, std::shared_ptr) to present null value:
+You should use **smart pointer**(such as *std::unique_ptr*, *std::shared_ptr*) to present null value:
 ```cpp
 TupleVector<string, string, string, unique_ptr<double>> results;
 
@@ -52,7 +65,7 @@ TupleVector<string, string, string, Double> result;
 mysql.RunQuery(result, "SELECT * FROM insturctor");
 // trigger static asserttion
 ```
-Also ,if you want to support self-defined type, you can register and specialize input and output binder, but I don't suggest do it
+Also ,if you want to support self-defined type, you can register and specialize input and output binder, but I don't suggest do it.
 
 ## injection safe
 Mysql provide prepared statement API, so the interface also wrap it to PreparedStmt RAII class.
