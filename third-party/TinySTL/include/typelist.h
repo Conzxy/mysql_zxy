@@ -38,7 +38,7 @@ namespace TinySTL {
 	namespace mpl {
 
 		namespace detail {
-			using int_=std::intmax_t;
+			using int_= unsigned;
 		}
 
 		using int_=detail::int_;
@@ -812,7 +812,51 @@ namespace TinySTL {
 
 			template<typename TL, typename Indices>
 			using Pick=typename detail::Pick_<TL, Indices>::type;
+				
+			// MakeIndexList
 			
+			namespace detail {
+				template<int_ B, int_ E, typename VL>
+				struct MakeIndexList_
+					: MakeIndexList_<B + 1, E, Push_Back<VL, CValueT<int_, B>>> {};
+
+				template<int_ B, typename VL>
+				struct MakeIndexList_<B, B, VL>
+					: Type_identity<VL> {};
+			}
+			
+			template<int_ B, int_ E>
+			using MakeIndexListT = detail::MakeIndexList_<B, E, Valuelist<int_>>;
+			template<int_ B, int_ E>
+			using MakeIndexList = typename MakeIndexListT<B, E>::type;
+		
+			template<int_ N>
+			using Make_IndexListT = MakeIndexListT<0, N>;
+
+			template<int_ N>
+			using Make_IndexList = typename Make_IndexListT<N>::type;
+
+			namespace detail{
+				template<typename Ostream>
+				Ostream& PrintValuelist(Ostream& os, mpl::Valuelist<int_>, bool is_first=true){
+					os << (is_first ? "[]" : "]");
+					return os;
+				}
+
+				template<typename Ostream, int_... values>
+				Ostream& PrintValuelist(Ostream& os, mpl::Valuelist<int_, values...>, bool is_first = true) {
+					using Cur = mpl::Valuelist<int_, values...>;
+					os << ((is_first) ? "[" : ", ");
+					os << mpl::TL::Front<Cur>::value;
+					return PrintValuelist(os, mpl::TL::Pop_Front<Cur>{}, false);
+				}
+			}
+
+			template<typename Ostream, typename T, int_ ...indices>
+			Ostream& operator<<(Ostream& os, mpl::Valuelist<T, indices...> x){
+				return detail::PrintValuelist(os, x);
+			}
+
 			// template vriable since c++14
 #if __cplusplus >= 201402L
 			template<typename List>

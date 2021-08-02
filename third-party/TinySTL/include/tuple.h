@@ -192,29 +192,50 @@ namespace TinySTL{
 
     //obtains the element at a given index in a tuple
     //Get<index>(tuple-object)
-    template<int_ N>
-    struct TupleGet{
-        template<typename ...Types>
-        inline static auto apply(Tuple<Types...>& self)
-		-> decltype(TupleGet<N-1>::apply(self.getTail())){
-            return TupleGet<N-1>::apply(self.getTail());
-        }
-    };
+	namespace detail {
+		template<int_ N>
+		struct TupleGet{
+			template<typename ...Types>
+			inline static auto apply(Tuple<Types...> const& self)
+			-> decltype(TupleGet<N-1>::apply(self.getTail())){
+				return TupleGet<N-1>::apply(self.getTail());
+			}
 
-    template<>
-    struct TupleGet<0>{
-        template<typename ...Types>
-        inline static auto apply(Tuple<Types...>& self)
-			->decltype(self.getHead()){
-            return self.getHead();
-        }
-    };
+			template<typename ...Types>
+			inline static auto apply(Tuple<Types...>& self)
+			-> decltype(TupleGet<N-1>::apply(self.getTail())){
+				return TupleGet<N-1>::apply(self.getTail());
+			}
+		};
+
+		template<>
+		struct TupleGet<0>{
+			template<typename ...Types>
+			inline static auto apply(Tuple<Types...> const& self)
+				-> decltype(self.getHead()){
+				return self.getHead();
+			}
+
+			template<typename ...Types>
+			inline static auto apply(Tuple<Types...>& self)
+				-> decltype(self.getHead()){
+				return self.getHead();
+			}
+		};
+	}
 
     template<int_ N,typename ...Types>
-    auto Get(Tuple<Types...>& self)
-		-> decltype(TupleGet<N>::apply(self)){
-        return TupleGet<N>::apply(self);
+    auto Get(Tuple<Types...> const& self)
+		-> decltype(detail::TupleGet<N>::apply(self)){
+        return detail::TupleGet<N>::apply(self);
     }
+	
+	template<int_ N, typename ...Types>
+	auto Get(Tuple<Types...> & self) ->
+		decltype(detail::TupleGet<N>::apply(self))
+	{
+		return detail::TupleGet<N>::apply(self);
+	}
 
     //Comparison
     //Tuple_1==Tuple_2
@@ -234,29 +255,11 @@ namespace TinySTL{
             t1.getTail()==t2.getTail();
     }
 
+
     //fall back if sizeof...(Tail1)!=sizeof...(Tail2)
     template<typename ...Types1,typename ...Types2>
     bool operator ==(Tuple<Types1...> const&,Tuple<Types2...> const& ){
         return false;
-    }
-
-    //Output
-	template<typename Ostream>
-    void PrintTuple(Ostream& os,Tuple<> const&,bool isFirst=true){
-        os<<(isFirst ? "()" : ")");
-    }
-
-    template<typename Ostream, typename ...Types>
-    void PrintTuple(Ostream& os,Tuple<Types...> const& t,bool isFirst=true){
-        os<<(isFirst ? "(" : ", ");
-        os<<t.getHead();
-        PrintTuple(os,t.getTail(),false);
-    }
-
-    template<typename Ostream, typename ...Types>
-    Ostream& operator<<(Ostream&& os,Tuple<Types...> const& t){
-        PrintTuple(os,t);
-        return os;
     }
 
     namespace mpl{
@@ -323,20 +326,6 @@ namespace TinySTL{
 			-> decltype(Reverse(Pop_Front(Reverse(t)))){
             return Reverse(Pop_Front(Reverse(t)));
         }
-        //Make_Indexlist
-        //Invocation:Make_Indexlist<N>(N is integer value)
-        //generates a index sequence in the form of Valuelist<integer_type,0,1,...,N-1>
-        template<int_ N,typename Result=mpl::Valuelist<int_>>
-        struct Make_IndexlistT
-                :Make_IndexlistT<N-1,mpl::TL::Push_Front<Result,mpl::CValueT<int_,N-1>>>{};
-
-        template<typename Result>
-        struct Make_IndexlistT<0,Result>{
-            using type=Result;
-        };
-
-        template<int_ N>
-        using Make_Indexlist=typename Make_IndexlistT<N>::type;
 
         //Pick
         //core operation for many algorithm of Tuple
@@ -355,9 +344,9 @@ namespace TinySTL{
         //->decltype(...)
         template<typename ...Elems>
         auto Reverse(Tuple<Elems...> const& t)
-        -> decltype(Pick(t,mpl::TL::Reverse<Make_Indexlist<sizeof...(Elems)>>()))
+        -> decltype(Pick(t,mpl::TL::Reverse<mpl::TL::Make_IndexList<sizeof...(Elems)>>()))
         {
-            return Pick(t,mpl::TL::Reverse<Make_Indexlist<sizeof...(Elems)>>());
+            return Pick(t,mpl::TL::Reverse<mpl::TL::Make_IndexList<sizeof...(Elems)>>());
         }
 
         //discard the reverse version as following
@@ -412,48 +401,31 @@ namespace TinySTL{
         template<template<typename ,typename > class Comp,typename ...Elems>
         auto sort(Tuple<Elems...> const& t)
 			-> decltype(Pick(t,
-                        TL_ Sort<Make_Indexlist<sizeof...(Elems)>,
+                        TL_ Sort<mpl::TL::Make_IndexList<sizeof...(Elems)>,
                                 MetaFun_Of_NthElement<Tuple<Elems...>,Comp>::template apply>()))
         {
             return Pick(t,
-                        TL_ Sort<Make_Indexlist<sizeof...(Elems)>,
+                        TL_ Sort<mpl::TL::Make_IndexList<sizeof...(Elems)>,
                                 MetaFun_Of_NthElement<Tuple<Elems...>,Comp>::template apply>());
         }
 
-		template<typename Ostream>
-		Ostream& PrintValuelist(Ostream& os, mpl::Valuelist<int_>, bool is_first=true){
-			os << (is_first ? "[]" : "]");
-			return os;
-		}
-
-		template<typename Ostream, int_... values>
-		Ostream& PrintValuelist(Ostream& os, mpl::Valuelist<int_, values...>, bool is_first = true) {
-			using Cur = mpl::Valuelist<int_, values...>;
-			os << ((is_first) ? "[" : ", ");
-			os << mpl::TL::Front<Cur>::value;
-			return PrintValuelist(os, mpl::TL::Pop_Front<Cur>{}, false);
-		}
-
-
-		template<typename Ostream, typename T, int_ ...indices>
-		Ostream& operator<<(Ostream& os, mpl::Valuelist<T, indices...> x){
-			return PrintValuelist(os, x);
-		}
-
-		template<typename F, typename ...Args, int_... indices>
-		auto for_each_impl(Tuple<Args...>& tuple, F&& func, mpl::Valuelist<int_, indices...>)
-		-> decltype(make_Tuple(func(Get<indices>(tuple))...)){
-			return make_Tuple(func(Get<indices>(tuple))...);
+		
+		namespace detail{		
+			template<typename F, typename ...Args, int_... indices>
+			auto for_each_impl(Tuple<Args...>& tuple, F&& func, mpl::Valuelist<int_, indices...>)
+			-> decltype(make_Tuple(func(Get<indices>(tuple))...)){
+				return make_Tuple(func(Get<indices>(tuple))...);
+			}
 		}
 
 		template<typename F, typename ...Args>
 		auto for_each(Tuple<Args...>& tuple, F&& func)
-		-> decltype(for_each_impl(tuple, STL_FORWARD(F, func), 
-					Make_Indexlist<sizeof...(Args)>{})){
-			using Indices = Make_Indexlist<sizeof...(Args)>;
+		-> decltype(detail::for_each_impl(tuple, STL_FORWARD(F, func), 
+					mpl::TL::Make_IndexList<sizeof...(Args)>{})){
+			using Indices = mpl::TL::Make_IndexList<sizeof...(Args)>;
 			
 
-			return for_each_impl(tuple, STL_FORWARD(F, func), Indices{});
+			return detail::for_each_impl(tuple, STL_FORWARD(F, func), Indices{});
 		}
 }
 

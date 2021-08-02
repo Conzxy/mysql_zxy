@@ -25,8 +25,8 @@ SMART_POINTER_PRINT(std::shared_ptr)
 // Output
 using TinySTL::int_;
 using TinySTL::Tuple;
-using TinySTL::Make_Indexlist;
 using TinySTL::mpl::Valuelist;
+using TinySTL::mpl::TL::Make_IndexList;
 
 template<typename Ostream, typename ...Args, int_... Indices>
 Ostream& PrintTuple(Ostream& os, Tuple<Args...> const& t, Valuelist<int_, Indices...>){
@@ -37,7 +37,7 @@ Ostream& PrintTuple(Ostream& os, Tuple<Args...> const& t, Valuelist<int_, Indice
 
 template<typename Ostream, typename ...Args>
 Ostream& operator<<(Ostream& os, Tuple<Args...> const& t){
-	return PrintTuple(os, t, Make_Indexlist<sizeof...(Args)>{});
+	return PrintTuple(os, t, Make_IndexList<sizeof...(Args)>{});
 }
 
 //template<typename Ostream>

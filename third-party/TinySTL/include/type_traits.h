@@ -44,7 +44,7 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 	using Conditional_t=typename detail::Conditional_<Cond>::template type<T, F>;
 
 	namespace detail {
-		using int_=std::intmax_t;
+		using int_= unsigned;
 	}
 
 	using int_=detail::int_;
