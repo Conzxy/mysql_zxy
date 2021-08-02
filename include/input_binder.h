@@ -11,9 +11,12 @@
 
 namespace zxy{
 
-using namespace TinySTL;
+using TinySTL::Conditional_t;
 using namespace TinySTL::mpl;
 using namespace TinySTL::mpl::TL;
+
+template<typename ...Args>
+void BindInputs(MysqlBindVector& parameters, Args&... args);
 
 namespace detail{
 
@@ -22,20 +25,20 @@ template<
 	unsigned End, // end after
 	typename Arg, // check type
 	bool is_mysql_type = IsMysqlType<Arg>::value> // check type whether mysql required type
-struct BindInputsImpl;
+struct InputBinder;
 
 // exit template recursion
 template<
 	unsigned N, 
 	typename Arg>
-struct BindInputsImpl<N, N, Arg, true>{
+struct InputBinder<N, N, Arg, true>{
 	static void Apply(MysqlBindVector&) 
 	{ }
 };
 
 // specialization: no mysql require type 
 template<unsigned N, unsigned End, typename Arg>
-struct BindInputsImpl<N, End, Arg, false> {
+struct InputBinder<N, End, Arg, false> {
 	template<typename... Args>
 	static void Apply(MysqlBindVector&){
 		static_assert(sizeof...(Args) < 0,
@@ -45,7 +48,7 @@ struct BindInputsImpl<N, End, Arg, false> {
 
 // specialization: string(including c-style and user-defined type)
 template<unsigned N, unsigned End>
-struct BindInputsImpl<N, End, char const*, true>{
+struct InputBinder<N, End, char const*, true>{
 	template<typename ...Args>
 	static void Apply(MysqlBindVector& parameters, char const* & str, Args&... args){
 		auto& parameter = parameters.at(N);
@@ -60,21 +63,21 @@ struct BindInputsImpl<N, End, char const*, true>{
 			  TypeIdentity<int>  
 				  >::type;
 		
-		BindInputsImpl<N + 1, End, Next>::Apply(parameters, args...);
+		InputBinder<N + 1, End, Next>::Apply(parameters, args...);
 	}
 };
 
 template<unsigned N, unsigned End>
-struct BindInputsImpl<N, End, char *, true>{
+struct InputBinder<N, End, char *, true>{
 	template<typename ...Args>
 	static void Apply(MysqlBindVector& parameters, char* & str, Args&... args){
-		BindInputsImpl<N, End, char const*>::Apply(parameters, str, args...);
+		InputBinder<N, End, char const*>::Apply(parameters, str, args...);
 	}
 };
 
 
 template<unsigned N, unsigned End>
-struct BindInputsImpl<N, End, std::string, true>  {
+struct InputBinder<N, End, std::string, true>  {
 	template<typename ...Args>
 	static void Apply(MysqlBindVector& parameters, std::string& str, Args&... args){
 		auto& parameter = parameters.at(N);
@@ -90,12 +93,12 @@ struct BindInputsImpl<N, End, std::string, true>  {
 			  TypeIdentity<int> 
 				  >::type;
 
-		BindInputsImpl<N + 1, End, Next>::Apply(parameters, args...);
+		InputBinder<N + 1, End, Next>::Apply(parameters, args...);
 	}
 };
 
 template<unsigned N, unsigned SZ, unsigned End>
-struct BindInputsImpl<N, End, char const[SZ], true>{
+struct InputBinder<N, End, char const[SZ], true>{
 	template<typename ...Args>
 	static void Apply(MysqlBindVector& parameters, char const(&str)[SZ], Args& ...args){
 		auto& parameter = parameters.at(N);
@@ -110,24 +113,24 @@ struct BindInputsImpl<N, End, char const[SZ], true>{
 			  TypeIdentity<int> 
 				  >::type;
 
-		BindInputsImpl<N + 1, End, Next>::Apply(parameters, args...);
+		InputBinder<N + 1, End, Next>::Apply(parameters, args...);
 	}
 };
 
 template<unsigned N, unsigned SZ, unsigned End>
-struct BindInputsImpl<N, End, char[SZ], true>{
+struct InputBinder<N, End, char[SZ], true>{
 	template<typename ...Args>
 	static void Apply(MysqlBindVector& parameters, char(&str)[SZ], Args&... args){
-		BindInputsImpl<N, End, char const[SZ]>::Apply(parameters, str, args...);
+		InputBinder<N, End, char const[SZ]>::Apply(parameters, str, args...);
 	}
 };
 
 #define BINDINPUTSIMPL_BLOB_SPECIALIZATION(type) \
 template<unsigned N, unsigned End>\
-struct BindInputsImpl<N, End, type, true>{\
+struct InputBinder<N, End, type, true>{\
 	template<typename ...Args>\
 	static void Apply(MysqlBindVector& parameters, type& blob, Args& ...args){\
-		BindInputsImpl<N, End, decltype(blob.data)>::Apply(parameters, blob, args...);\
+		InputBinder<N, End, decltype(blob.data)>::Apply(parameters, blob, args...);\
 	}\
 };
 
@@ -140,7 +143,7 @@ BINDINPUTSIMPL_BLOB_SPECIALIZATION(LongBlob)
 // integers and float pointing
 // time
 template<unsigned N, unsigned End, typename Arg> 
-struct BindInputsImpl<N, End, Arg, true>{
+struct InputBinder<N, End, Arg, true>{
 	template<typename ...Args>
 	static void Apply(MysqlBindVector& parameters, Arg& arg, Args&... args){
 		auto& parameter = parameters.at(N);
@@ -155,7 +158,7 @@ struct BindInputsImpl<N, End, Arg, true>{
 			  TypeIdentity<int>
 				  >::type;
 
-		BindInputsImpl<N + 1, End, Next>::Apply(parameters, args...);
+		InputBinder<N + 1, End, Next>::Apply(parameters, args...);
 	}
 };
 
@@ -168,7 +171,7 @@ void BindInputs(MysqlBindVector& parameters, Args&... args){
 		  TypeIdentity<int>
 			>::type;
 
-	detail::BindInputsImpl<0, sizeof...(Args), Head>::Apply(parameters, args...);
+	detail::InputBinder<0, sizeof...(Args), Head>::Apply(parameters, args...);
 }
 
 } // namespace zxy
