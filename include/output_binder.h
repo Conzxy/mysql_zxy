@@ -186,7 +186,7 @@ void TupleSetterImpl(Arg& arg, MYSQL_BIND& bind){
 template<typename T> \
 void TupleSetterImpl(type<T>& arg, MYSQL_BIND& bind){ \
 	if(*bind.is_null) \
-		arg.reset(nullptr); \
+		arg.reset(); \
 	else \
 		arg.reset(new T(*reinterpret_cast<T*>(bind.buffer))); \
 }
