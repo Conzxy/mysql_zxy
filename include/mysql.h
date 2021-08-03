@@ -1,7 +1,6 @@
 #ifndef _ZXY_MYSQL_H
 #define _ZXY_MYSQL_H
 
-#include <mysql/my_command.h>
 #include <mysql/mysql.h>
 #include "helper.h"
 #include "util/noncopyable.h"
@@ -31,9 +30,10 @@ public:
 		uint16_t port = 3306
 	);
 
-	~Mysql() { 
-		mysql_close(connection_);
-	}
+	~Mysql();
+	
+	Mysql(Mysql&&) noexcept;
+	Mysql& operator=(Mysql&&) noexcept;
 
 	/**
 	 * @brief run modified command : INSERT UPDATE DELETE

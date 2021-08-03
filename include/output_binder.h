@@ -2,7 +2,6 @@
 #define _ZXY_MYSQL_OUTPUT_BINDER_H
 
 #include "mysql_stmt.h"
-#include "tuple.h"
 #include "type_def.h"
 #include "type_map.h"
 #include "type_traits.h"
