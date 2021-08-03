@@ -2,6 +2,8 @@
 #include <mysql/mysql.h>
 #include <stdio.h>
 #include "mysql_exception.h"
+#include "config.h"
+#include "utility.h"
 
 namespace zxy{
 	Mysql::Mysql(
@@ -46,7 +48,21 @@ namespace zxy{
 		: Mysql(host, user, password, NULL, port)
 	{ }
 
+	Mysql::Mysql(Mysql&& other) noexcept
+		: connection_{ other.connection_ }
+	{ other.connection_ = NULL; }
 
+	Mysql& Mysql::operator=(Mysql&& other) noexcept
+	{
+		STL_SWAP(this->connection_, other.connection_);
+		return *this;
+	}
+
+	Mysql::~Mysql()
+	{
+		if(connection_)
+			mysql_close(connection_);
+	}
 } //namespace zxy
 
 
