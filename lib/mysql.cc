@@ -2,8 +2,8 @@
 #include <mysql/mysql.h>
 #include <stdio.h>
 #include "mysql_exception.h"
-#include "config.h"
-#include "utility.h"
+#include "third-party/TinySTL/include/config.h"
+#include "third-party/TinySTL/include/utility.h"
 
 namespace zxy{
 	Mysql::Mysql(

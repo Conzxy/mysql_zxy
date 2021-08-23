@@ -1,8 +1,8 @@
 #include "mysql_stmt.h"
 #include <string>
 #include <string.h>
-#include "utility.h"
-#include "config.h"
+#include "third-party/TinySTL/include/utility.h"
+#include "third-party/TinySTL/include/config.h"
 #include "mysql_exception.h"
 
 namespace zxy {
@@ -59,9 +59,9 @@ PreparedStmt& PreparedStmt::operator=(PreparedStmt&& rhs) noexcept
 
 void PreparedStmt::swap(PreparedStmt& rhs) noexcept
 {
-	std::swap(stmt_, rhs.stmt_);	
-	std::swap(parameter_count_, rhs.parameter_count_);
-	std::swap(field_count_, rhs.field_count_);
+	STL_SWAP(stmt_, rhs.stmt_);	
+	STL_SWAP(parameter_count_, rhs.parameter_count_);
+	STL_SWAP(field_count_, rhs.field_count_);
 }
 
 } // namespace zxy
