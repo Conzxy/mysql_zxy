@@ -1,18 +1,19 @@
 #ifndef _ZXY_MYSQL_PRINT_H
 #define _ZXY_MYSQL_PRINT_H
 
-#include "tuple.h"
 #include "type_def.h"
-#include "typelist.h"
+#include "third-party/TinySTL/include/tuple.h"
+#include "third-party/TinySTL/include/typelist.h"
 #include <memory>
 #include <mysql/mysql.h>
+
 
 namespace zxy{
 
 #define SMART_POINTER_PRINT(wrapper) \
 template<typename Ostream, typename T> \
 Ostream& operator<<(Ostream& os, wrapper<T> const& p){ \
-	if(! p) \
+	if(!p) \
 		os << "NULL"; \
 	else \
 		os << *p; \

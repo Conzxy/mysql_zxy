@@ -6,7 +6,7 @@
 #include <mysql/mysql_com.h>
 #include <string>
 #include "type_def.h"
-#include "stl_type_traits_base.h"
+#include "third-party/TinySTL/include/stl_type_traits_base.h"
 
 namespace zxy{
 

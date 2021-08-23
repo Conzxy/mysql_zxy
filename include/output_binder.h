@@ -4,12 +4,10 @@
 #include "mysql_stmt.h"
 #include "type_def.h"
 #include "type_map.h"
-#include "type_traits.h"
-#include <mysql/field_types.h>
-#include <mysql/mysql.h>
 #include <memory>
 #include <assert.h>
-#include "typelist.h"
+#include "third-party/TinySTL/include/type_traits.h"
+#include "third-party/TinySTL/include/typelist.h"
 #include "mysql_exception.h"
 #include "helper.h"
 
