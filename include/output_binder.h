@@ -23,10 +23,9 @@ namespace detail{
 /////////////////////////////
 // Output Parameters Binder
 /////////////////////////////
-void BindOutput(
+void BindOutputs(
 		MysqlBindVector& binds,
-		MysqlBufferVector& buffers,
-		std::vector<bool>& is_nulls);
+		MysqlBufferVector& buffers);
 
 
 template<
@@ -37,7 +36,7 @@ struct OutputBinder;
 // not mysql required type
 template<typename Arg>
 struct OutputBinder<Arg, false>{
-	static void Apply(MYSQL_BIND& , MysqlBuffer& , bool& ){
+	static void Apply(MYSQL_BIND& , MysqlBuffer&){
 		// sizeof(Arg) is always false
 		// so this assert must be triggered
 		static_assert(sizeof(Arg) < 0, 
@@ -50,60 +49,57 @@ struct OutputBinder<Arg, false>{
 // char*
 template<>
 struct OutputBinder<char*, true>{
-	static void Apply(MYSQL_BIND& bind, MysqlBuffer& buffer, bool& is_null){
+	static void Apply(MYSQL_BIND& bind, MysqlBuffer& buffer){
 		bind.buffer_type = MYSQL_TYPE_STRING;
 		//set a valid buffer size 
 		if(buffer.size() == 0)
 			buffer.resize(30);
 		bind.buffer = buffer.data();
 		bind.buffer_length = buffer.size();
-		bind.is_null = &is_null;
 	}
 };
+
 
 // std::string
 template<>
 struct OutputBinder<std::string, true>{
-	static void Apply(MYSQL_BIND& bind, MysqlBuffer& buffer, bool& is_null){
+	static void Apply(MYSQL_BIND& bind, MysqlBuffer& buffer) {
 		bind.buffer_type = MYSQL_TYPE_VAR_STRING;
 		if(buffer.size() == 0)
 			buffer.resize(30);
 		bind.buffer = buffer.data();
 		bind.buffer_length = buffer.size();
-		bind.is_null = &is_null;
 	}
 };
 
 template<unsigned SZ>
 struct OutputBinder<char[SZ], true>{
-	static void Apply(MYSQL_BIND& bind, MysqlBuffer& buffer, bool& is_null){
+	static void Apply(MYSQL_BIND& bind, MysqlBuffer& buffer) {
 		bind.buffer_type = MYSQL_TYPE_VAR_STRING;
 		if(buffer.size() == 0)
 			buffer.resize(SZ);
 		bind.buffer = buffer.data();
 		bind.buffer_length = buffer.size();
-		bind.is_null = &is_null;
 	}
 };
 
 // other type
 template<typename Arg>
 struct OutputBinder<Arg, true>{
-	static void Apply(MYSQL_BIND& bind, MysqlBuffer&  buffer, bool& is_null){
+	static void Apply(MYSQL_BIND& bind, MysqlBuffer& buffer){
 		bind.buffer_type = TypeMap(TypeIdentity<Arg>{});
 		buffer.resize(sizeof(Arg));
 		bind.buffer = buffer.data();
-		bind.is_null = &is_null;	
 		bind.is_unsigned = TinySTL::Is_unsigned<Arg>::value;
 	}
 };
 
 // prohibit raw pointer
 // represent value while may be 'null'
-// should use smart pointer(resource safe and no memery leak since RAII tenique)
+// should use smart pointer(resource safe and no memery leak since RAII technique)
 template<typename Arg>
 struct OutputBinder<Arg*, false>{
-	static void Apply(MYSQL_BIND&, MysqlBuffer& , bool& ){
+	static void Apply(MYSQL_BIND&, MysqlBuffer&){
 		static_assert(sizeof(Arg) < 0,
 				"You should set smart pointer(e.g. std::unique_ptr, std::shared_ptr)"
 				"because raw pointer may be wild pointer");
@@ -114,8 +110,8 @@ struct OutputBinder<Arg*, false>{
 #define WRAPPER_OF_OUTPUT_BINDER_FULL_SPECIALIZATION(type)  \
 template<typename Arg> \
 struct OutputBinder<type<Arg>, false>{ \
-	static void Apply(MYSQL_BIND& bind, MysqlBuffer& buffer, bool& is_null){ \
-		OutputBinder<Arg>::Apply(bind, buffer, is_null); \
+	static void Apply(MYSQL_BIND& bind, MysqlBuffer& buffer){ \
+		OutputBinder<Arg>::Apply(bind, buffer); \
 	} \
 };
 
@@ -129,32 +125,25 @@ using TinySTL::mpl::TL::Type_At;
 using TinySTL::mpl::int_;
 		
 template<typename TL, int_... Indices>
-void BindOutputImpl(
+void BindOutputsImpl(
 		MysqlBindVector& binds,
 		MysqlBufferVector& buffers,
-		MysqlIsNullVector& is_nulls,
 		Valuelist<int_, Indices...>)
 { 
-	int dummy[] = { ((OutputBinder<
-				Type_At<TL, Indices>
-				>::Apply(
-				binds[Indices], 
-				buffers[Indices], 
-				is_nulls[Indices])), 0)... };
+	int dummy[] = { ((OutputBinder<Type_At<TL, Indices>>::Apply(
+					binds[Indices], 
+					buffers[Indices])), 0)... };
 }
 
 template<typename ...Args>
-void BindOutput(
+void BindOutputs(
 		MysqlBindVector& binds,
-		MysqlBufferVector& buffers,
-		MysqlIsNullVector& is_nulls)
+		MysqlBufferVector& buffers)
 {
 	assert(binds.size() == buffers.size());
-	assert(binds.size() == is_nulls.size());
-	assert(buffers.size() == is_nulls.size());
 	
-	BindOutputImpl<Typelist<Args...>>(
-			binds, buffers, is_nulls, 
+	BindOutputsImpl<Typelist<Args...>>(
+			binds, buffers, 
 			Make_IndexList<sizeof...(Args)>{});
 }
 
@@ -165,7 +154,7 @@ void BindOutput(
 char const kNullErrorMessage[] = "null value is only allowed to present by smart pointer";
 
 // no need to IsMysqlType
-// because call TupleSetter after BindOutput()
+// because call TupleSetter after BindOutputs()
 template<typename ...Args>
 void TupleSetter(TinySTL::Tuple<Args...>& tuple, MysqlBindVector& binds);
 
@@ -193,7 +182,7 @@ template<>
 inline void TupleSetter<std::string>(std::string& str, MYSQL_BIND& bind){
 	if(*bind.is_null)
 		throw MysqlException{kNullErrorMessage};
-
+	
 	str = reinterpret_cast<char*>(bind.buffer);
 }
 
@@ -220,32 +209,41 @@ void SetTuple(
 template<typename ...Args>
 void SetResultset(TupleVector<Args...>& tuples, PreparedStmt const& stmt){
 	helper::ThrowIfNotRequiredFieldCount(stmt, sizeof...(Args));	
-
+			
 	MysqlBindVector binds(stmt.field_count());
 	MysqlBufferVector buffers(stmt.field_count());
 	MysqlIsNullVector is_nulls(stmt.field_count());
+	MysqlBindLengthVector lengths(stmt.field_count());	
+
+	detail::BindOutputs<Args...>(binds, buffers);
 	
-	detail::BindOutput<Args...>(binds, buffers, is_nulls);
+	for(unsigned i = 0; i != stmt.field_count(); ++i)
+	{
+		binds[i].length = &lengths[i];
+		binds[i].is_null = &is_nulls[i];
+	}
+
 	helper::BindResultAndExec(stmt, binds);
-	auto fetchret = helper::Fetch(stmt);
+	
+	auto fetchret = stmt.Fetch();
 
 	while(true){
-		if(fetchret == MYSQL_DATA_TRUNCATED){
-			helper::ReFetchTruncCol(stmt, binds, buffers);
-		}
-
-		if(fetchret != 0)
-			helper::ThrowIfFetchFialed(stmt, fetchret);
-
 		if(fetchret == MYSQL_NO_DATA)
 			break;
+
+		if(fetchret == 1)
+			throw MysqlException{ stmt.stmt() };
+		
+		if(fetchret == MYSQL_DATA_TRUNCATED){
+			helper::ReFetchTruncCol(stmt, binds, buffers, lengths);
+		}
 
 		Tuple<Args...> row{};
 
 		detail::SetTuple(row, binds);
 		tuples.emplace_back(std::move(row));	
 		
-		fetchret = helper::Fetch(stmt);
+		fetchret = stmt.Fetch();
 	}
 
 }

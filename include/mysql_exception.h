@@ -3,6 +3,7 @@
 
 #include <mysql/mysql.h>
 #include <string>
+#include <string.h>
 
 namespace zxy{
 

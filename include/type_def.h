@@ -9,6 +9,9 @@
 #include <mysql/mysql.h>
 #include "third-party/TinySTL/include/tuple.h"
 #include <memory>
+#include "util/noncopyable.h"
+#include <time.h>
+#include <string.h>
 
 namespace zxy{
 
@@ -17,67 +20,59 @@ constexpr int kBlobSize = 1 << 16; //64K
 constexpr int kMBlobSize = 1 << 24; //16M
 constexpr int64_t kLBlobSize = static_cast<int64_t>(1) << 32; //4G;
 
-struct MysqlTimeBuilder;
 
 //make_unique since c++14
 template<typename T, typename ...Args>
 std::unique_ptr<T> MakeUnique(Args&&... args) 
 { return std::unique_ptr<T>(new T(STL_FORWARD(Args, args)...)); }
 
-#define DEFINE_SQL_TIME(name) \
-struct name {  \
-	using self = name; \
-public:  \
-	MYSQL_TIME& data() noexcept \
-	{ return data_; } \
-	 \
-	MYSQL_TIME const& data() const noexcept \
-	{ return data_; } \
- \
-	name(MYSQL_TIME const& time)\
-		: data_{ time }\
-	{ }\
-\
-	static std::unique_ptr<MysqlTimeBuilder> Build() \
-	{ return MakeUnique<MysqlTimeBuilder>(); } \
-private: \
-	MYSQL_TIME data_;  \
+class MysqlTime : public MYSQL_TIME
+{
+public:
+	MysqlTime() = default;
+	~MysqlTime() = default;
+	
+	MysqlTime(const struct tm& time)
+	{
+		year = time.tm_year + 1900;
+		month = time.tm_mon + 1;
+		day = time.tm_mday;
+		hour = time.tm_hour;
+		minute = time.tm_min;
+		second = time.tm_sec;
+		// second_part must be specified if buffer_type is DATETIME, TIMESTAMP
+		second_part = 0;
+		time_type = MYSQL_TIMESTAMP_DATETIME;
+	}
+
+
+	MysqlTime(time_t value)
+	{
+		struct tm time;
+		localtime_r(&value, &time);
+		new(this) MysqlTime(time);
+	}
+	
+	static MysqlTime now()
+	{
+		time_t value;
+		::time(&value);
+		return MysqlTime(value);
+	}
+	
+	time_t time() const
+	{
+		struct tm time;
+		time.tm_year = year - 1900;
+		time.tm_mon = month - 1;
+		time.tm_mday = day;
+		time.tm_min = minute;
+		time.tm_sec = second;
+		return ::mktime(&time);
+	}
 };
 
-struct MysqlTimeBuilder { 
-	using self = MysqlTimeBuilder;
-
-	MYSQL_TIME time_;
-
-	MysqlTimeBuilder()
-	{ } 
-
-	self& Year(unsigned int y) 
-	{ time_.year = y; return *this; } 
-                                                                           
-	self& Month(unsigned int m)
-	{ time_.month = m; return *this; } 
- 
-	self&  Day(unsigned int d) 
-	{ time_.day = d; return *this; } 
-	
-	self& Hour(unsigned int h)
-	{ time_.hour = h; return *this; } 
-
-	self& Minute(unsigned int min)
-	{ time_.minute = min; return *this; }
-
-	self& Second(unsigned int second)
-	{ time_.second = second; return *this; }
- 
-}; 
-
-DEFINE_SQL_TIME(Date)
-DEFINE_SQL_TIME(DateTime)
-DEFINE_SQL_TIME(Timestamp)
-DEFINE_SQL_TIME(Time)
-
-template<int64_t N>
+template<uint64_t N>
 struct SQLBlob{
 	char data[N];
 };
@@ -89,9 +84,10 @@ using LongBlob = SQLBlob<kLBlobSize>;
 
 using MysqlOff = unsigned long;
 using MysqlCol = unsigned int;
+using MysqlBindLength = unsigned long;
 
 using MysqlBuffer = std::vector<char>;
-
+using MysqlBindLengthVector = std::vector<MysqlBindLength>;
 using MysqlBindVector = std::vector<MYSQL_BIND>;
 
 using TinySTL::Tuple;

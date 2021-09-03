@@ -9,13 +9,15 @@
 #include "type_def.h"
 #include "input_binder.h"
 #include "output_binder.h"
+#include "third-party/TinySTL/include/string_view.h"
+#include <mysql/mysqld_error.h>
 
 
 namespace zxy{
 	
-class Mysql : noncopyable {
+class Database : noncopyable {
 public:
-	Mysql(
+	Database(
 		char const* host,
 		char const* user,
 		char const* password,
@@ -23,17 +25,20 @@ public:
 		uint16_t port = 3306
 	);
 
-	Mysql(
+	Database(
 		char const* host,
 		char const* user,
 		char const* password,
 		uint16_t port = 3306
 	);
 
-	~Mysql();
+	~Database();
 	
-	Mysql(Mysql&&) noexcept;
-	Mysql& operator=(Mysql&&) noexcept;
+	Database(Database&&) noexcept;
+	Database& operator=(Database&&) noexcept;
+	
+	int SetCharacterSet(char const* csname)
+	{ return mysql_set_character_set(connection_, csname); }
 
 	/**
 	 * @brief run modified command : INSERT UPDATE DELETE
@@ -43,13 +48,15 @@ public:
 	 * @return the number of affected rows
 	 */
 	template<typename ... Args>
-	uint64_t RunModification(PreparedStmt const& stmt, Args&... args);
+	uint64_t RunModification(PreparedStmt const& stmt, Args const&... args);
 	
 
 	template<typename ...Args>
-	uint64_t RunModification(char const* query, Args&... args)
-	{ return RunModification(PreparedStmt(connection_, query), args...); }
+	uint64_t RunModification(TinySTL::string_view query, Args const&... args)
+	{ return RunModification(GetPreparedStmt(query), args...); }
 	
+	uint64_t RunModification(TinySTL::string_view query);
+
 	/**
 	 * @brief run query command : SELECT
 	 * @tparam InputArgs "?" parameter type
@@ -63,22 +70,28 @@ public:
 	void RunQuery(TupleVector<OutputArgs...>& result, PreparedStmt const& stmt,  InputArgs&... args);
 	
 	template<typename ...InputArgs, typename ...OutputArgs>
-	void RunQuery(TupleVector<OutputArgs...>& result, char const* query, InputArgs&... args)
-	{ RunQuery(result, PreparedStmt(connection_, query), args...); }
-	
-	PreparedStmt GetPreparedStmt(char const* query) const
+	void RunQuery(TupleVector<OutputArgs...>& result, TinySTL::string_view query, InputArgs&... args)
+	{ RunQuery(result, GetPreparedStmt(query), args...); }
+
+// use this interface get prepared statement
+	PreparedStmt GetPreparedStmt(TinySTL::string_view query) const
 	{ return PreparedStmt{ connection_, query }; }
 
-	PreparedStmt GetPreparedStmt(std::string const& query) const
-	{ return GetPreparedStmt(query.c_str()); }
-
+// get
 	MYSQL* connection() const noexcept { return connection_; }
+
+// state
+	bool IsTableExists() const noexcept 
+	{ return saved_errno_ == ER_TABLE_EXISTS_ERROR; }
+
 private:
 	MYSQL* connection_;
+
+	decltype(mysql_errno(connection_)) saved_errno_;
 };
 
 template<typename ...Args>
-uint64_t Mysql::RunModification(PreparedStmt const& stmt, Args&... args){
+uint64_t Database::RunModification(PreparedStmt const& stmt, Args const&... args){
 	if(stmt.field_count() != 0)
 		throw MysqlException{"Tried to run query with RunModification(You should call RunQuery()"};
 
@@ -95,13 +108,18 @@ uint64_t Mysql::RunModification(PreparedStmt const& stmt, Args&... args){
 	//exec
 	if(mysql_stmt_execute(stmt.stmt())){
 		std::string error = MysqlException::GetServerError(stmt.stmt());
-		throw MysqlException{ error + "(occurred in call to mysql_stmt_execute())" };
+		saved_errno_ = mysql_errno(connection_);
+		if (saved_errno_ != ER_TABLE_EXISTS_ERROR)
+			throw MysqlException{ error + "(occurred in call to mysql_stmt_execute())" };
+		else {
+			return -1;
+		}
 	}
 	
 	//check affected rows
 	const auto affected_rows = mysql_stmt_affected_rows(stmt.stmt());
 	if(affected_rows == static_cast<decltype(affected_rows)>(-1)){
-		//error occured or SELECT
+		//error occured or SELECT	
 		throw MysqlException{"Error occurred or Tried to query with RunModification()"
 			"(occurred in call to mysql_stmt_affected_rows())"};
 	}
@@ -111,7 +129,7 @@ uint64_t Mysql::RunModification(PreparedStmt const& stmt, Args&... args){
 }
 
 template<typename ...InputArgs, typename ...OutputArgs>
-void Mysql::RunQuery(TupleVector<OutputArgs...>& result, PreparedStmt const& stmt, InputArgs& ...args){
+void Database::RunQuery(TupleVector<OutputArgs...>& result, PreparedStmt const& stmt, InputArgs& ...args){
 	if(stmt.field_count() == 0)
 		throw MysqlException{"Tried to run Modification with RunQuery()"};
 	
@@ -126,6 +144,7 @@ void Mysql::RunQuery(TupleVector<OutputArgs...>& result, PreparedStmt const& stm
 	
 	SetResultset(result, stmt);
 }
+
 
 } //namespace zxy
 

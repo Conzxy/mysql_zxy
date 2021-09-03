@@ -30,6 +30,7 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 	/////////////////////////
 	///////basic tool////////
 	/////////////////////////
+	
 	//provide SFINAE context to SFINAE out failure version 
 	template<typename...>
 	using Void_t=void;
@@ -44,11 +45,50 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 	using Conditional_t=typename detail::Conditional_<Cond>::template type<T, F>;
 
 	namespace detail {
-		using int_= unsigned;
+		using int_ = unsigned;
 	}
 
 	using int_=detail::int_;
+
+	namespace detail {
+		template<bool B, typename T=void>
+		struct Enable_if_;
+
+		template<typename T>
+		struct Enable_if_ <true, T> {
+			using type=T;
+		};
+	}
+
+	template<bool Cond,typename T=void>
+	using Enable_if_t=typename detail::Enable_if_<Cond,T>::type;
 	
+	namespace detail {
+#if __cplusplus < 201402L
+		template<typename T1, typename T2>
+		struct Is_sameT :_false_type {
+		};
+
+		template<typename T>
+		struct Is_sameT<T, T> :_true_type {
+		};
+		
+#else	
+		//Based on the rule of chiel
+		template<typename T1,typename T2>
+		constexpr bool Is_same_=false;
+
+		template<typename T>
+		constexpr bool Is_same_<T,T> =true;
+
+		template<typename T, typename U>
+		struct Is_sameT : Bool_constant<Is_same_<T, U>> {};
+#endif
+	}
+	
+	template<typename T, typename U>
+	using Is_same = detail::Is_sameT<T, U>;
+
 	////////////////////////
 	///Type modifications///
 	////////////////////////
@@ -327,6 +367,15 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 	//logical NOT metafunction
 	template<typename T>
 	struct Negation :detail::_not_<T> {};
+	
+	template<typename... Tn>
+	using Conjunction_t = typename Conjunction<Tn...>::type;
+
+	template<typename... Tn>
+	using Disjunction_t = typename Disjunction<Tn...>::type;
+
+	template<typename T>
+	using Negation_t = typename Negation<T>::type;
 
 	//////////////////////////////////////
 	///Check the Primary Type Category////
@@ -546,7 +595,6 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 	template<typename T>
 	using Is_class=typename detail::Is_class_<T>::type;
 
-#if __cplusplus >= 201703L
 //the helper of Is_function
 #define DEFINE_IS_FUNCTION(TYPE)									\
 	template<typename R, typename ...Paras>								\
@@ -564,7 +612,6 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 		using Parameter=mpl::Typelist<Paras...>;						\
 		static constexpr bool variadic=true;							\
 	};
-#endif
 
 	namespace detail {
 		//check if a type is a function type
@@ -588,22 +635,36 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 			static constexpr bool variadic=true;
 		};
 
-#if __cplusplus >= 201703L	
 		//cv
 		DEFINE_IS_FUNCTION(const)
 		DEFINE_IS_FUNCTION(volatile)
 		DEFINE_IS_FUNCTION(const volatile)
+		DEFINE_IS_FUNCTION_VARG(const)
+		DEFINE_IS_FUNCTION_VARG(volatile)
+		DEFINE_IS_FUNCTION_VARG(const volatile)
 
 		//&/&&
 		DEFINE_IS_FUNCTION(&)
 		DEFINE_IS_FUNCTION(const&)
 		DEFINE_IS_FUNCTION(volatile&)
 		DEFINE_IS_FUNCTION(const volatile&)
+		DEFINE_IS_FUNCTION_VARG(&)
+		DEFINE_IS_FUNCTION_VARG(const&)
+		DEFINE_IS_FUNCTION_VARG(volatile&)
+		DEFINE_IS_FUNCTION_VARG(const volatile&)
+
 		DEFINE_IS_FUNCTION(&&)
 		DEFINE_IS_FUNCTION(const&&)
 		DEFINE_IS_FUNCTION(volatile&&)
 		DEFINE_IS_FUNCTION(const volatile&&)
+		DEFINE_IS_FUNCTION_VARG(&&)
+		DEFINE_IS_FUNCTION_VARG(const&&)
+		DEFINE_IS_FUNCTION_VARG(volatile&&)
+		DEFINE_IS_FUNCTION_VARG(const volatile&&)
 
+#if __cplusplus >= 201703L	
+// before C++ 17 
+// qualifier "const" and "const noexcept" is not different
 		//noexcept
 		DEFINE_IS_FUNCTION(noexcept)
 		DEFINE_IS_FUNCTION(const noexcept)
@@ -617,18 +678,6 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 		DEFINE_IS_FUNCTION(const&& noexcept)
 		DEFINE_IS_FUNCTION(volatile&& noexcept)
 		DEFINE_IS_FUNCTION(const volatile&& noexcept)
-
-		//variadic
-		DEFINE_IS_FUNCTION_VARG(volatile)
-		DEFINE_IS_FUNCTION_VARG(const volatile)
-		DEFINE_IS_FUNCTION_VARG(&)
-		DEFINE_IS_FUNCTION_VARG(const&)
-		DEFINE_IS_FUNCTION_VARG(volatile&)
-		DEFINE_IS_FUNCTION_VARG(const volatile&)
-		DEFINE_IS_FUNCTION_VARG(&&)
-		DEFINE_IS_FUNCTION_VARG(const&&)
-		DEFINE_IS_FUNCTION_VARG(volatile&&)
-		DEFINE_IS_FUNCTION_VARG(const volatile&&)
 		DEFINE_IS_FUNCTION_VARG(noexcept)
 		DEFINE_IS_FUNCTION_VARG(const noexcept)
 		DEFINE_IS_FUNCTION_VARG(volatile noexcept)
@@ -641,8 +690,7 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 		DEFINE_IS_FUNCTION_VARG(const&& noexcept)
 		DEFINE_IS_FUNCTION_VARG(volatile&& noexcept)
 		DEFINE_IS_FUNCTION_VARG(const volatile&& noexcept)
-		DEFINE_IS_FUNCTION_VARG(const)
-#endif
+#endif // _cpluscplus >= 201703L
 	}
 
 	//no need to provide Remove_cv_t,because the cv specifiers have different means on function
@@ -757,6 +805,7 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 	//Is_standard_layout
 	//Is_literal_type
 
+#if __cplusplus < 201103L
 	template<typename T>
 	using Is_pod=typename _type_traits<T>::is_POD_type;
 
@@ -771,17 +820,49 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 
 	template<typename T>
 	using Is_trivially_destructible=typename _type_traits<T>::has_trivially_destructor;
+#endif
 
 	namespace detail {
-		template<typename T, typename=Void_t<>>
-		struct Is_empty_ :_false_type {};
+		// however, T can not be final class
+		//template<typename T, typename=_true_type>
+		//struct Is_emptyT : T {};
 
-		template<typename T>
-		struct Is_empty_<T, Void_t<decltype(sizeof(T)==1)>> :_true_type {};
+		//template<typename T>
+		//struct Is_emptyT < T, typename Is_class<T>::type > { long x; };
+
+		//template<typename T>
+		//struct Is_empty_ : Bool_constant<sizeof(Is_emptyT<T>) == 1> {};
+		//
+		//final class predicate may need compiler support
+		//
+		// __is_empty(), __is_final()[ not macro ]
 	}
 
+
+//#ifdef __is_empty
+		template<typename T>
+		struct Is_empty : Bool_constant<__is_empty(T)> {};
+		
+# if __cplusplus >= 201402L
+		template<typename T>
+		constexpr bool Is_empty_v = Is_empty<T>::value;
+# endif
+//#endif
+
+//#ifdef __is_final
+		template<typename T>
+		struct Is_final : Bool_constant<__is_final(T)> {};
+
+# if __cplusplus >=201402L
+		template<typename T>
+		constexpr bool Is_final_v = Is_final<T>::value;
+# endif
+//#endif
+
 	template<typename T>
-	using Is_empty=typename detail::Is_empty_<T>::type;
+	struct Is_referenceable
+		: Bool_constant<Negation_t<Is_same<T, void>>::value>
+	{ };
 
 	namespace detail {
 		//use the property of dynamic_cast
@@ -798,7 +879,7 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 	using Is_polymorphic=decltype(detail::Is_polymorphic_<T>(nullptr));
 
 	namespace detail {
-		template<typename T, typename=Conjunction<Is_class<T>, Is_polymorphic<T>>>
+		template<typename T, typename= Conjunction_t<Is_class<T>, Is_polymorphic<T>>>
 		struct Is_abstract_ :_true_type {};
 
 		template<typename T>
@@ -918,229 +999,229 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 	///Supported operations////
 	///////////////////////////
 
-#if __cplusplus >= 201703L	
-	namespace detail {
-		//generic lambda version
-		//helper:check validity of f(args...) for F f and Args...args
-		template<typename F, typename...Args, typename=
-			decltype(declval<F>()(declval<Args&&>()...))>
-			_true_type Is_valid_impl(void*);
+//#if __cplusplus >= 201703L	
+	//namespace detail {
+		////generic lambda version
+		////helper:check validity of f(args...) for F f and Args...args
+		//template<typename F, typename...Args, typename=
+			//decltype(declval<F>()(declval<Args&&>()...))>
+			//_true_type Is_valid_impl(void*);
 
-		template<typename F, typename...Args>
-		//template<typename ...args>
-		_false_type Is_valid_impl(...);
+		//template<typename F, typename...Args>
+		////template<typename ...args>
+		//_false_type Is_valid_impl(...);
 
-		//traits factory
-		inline constexpr
-			auto Is_valid=[](auto f) {
-			return [](auto&&... Args) {
-				return decltype(Is_valid_impl<decltype(f),
-					decltype(Args)&& ...
-				>(nullptr)){};
-			};
-		};
+		////traits factory
+		//inline constexpr
+			//auto Is_valid=[](auto f) {
+			//return [](auto&&... Args) {
+				//return decltype(Is_valid_impl<decltype(f),
+					//decltype(Args)&& ...
+				//>(nullptr)){};
+			//};
+		//};
 
-		//helper template to present a type as a value
-		template<typename T>
-		struct typeT {
-			using type=T;
-		};
+		////helper template to present a type as a value
+		//template<typename T>
+		//struct typeT {
+			//using type=T;
+		//};
 
-		//helper to wrap a type as a value
-		template<typename T>
-		constexpr auto type=typeT<T>{};
+		////helper to wrap a type as a value
+		//template<typename T>
+		//constexpr auto type=typeT<T>{};
 
-		//helper to unwrap a wrapped type in unevaluated context
-		template<typename T>
-		T valueT(typeT<T>);  //no definition needed
+		////helper to unwrap a wrapped type in unevaluated context
+		//template<typename T>
+		//T valueT(typeT<T>);  //no definition needed
 
-		//typeT--->[valueT]--->T
+		////typeT--->[valueT]--->T
 
 		
-		constexpr auto Is_default_constructible_
-			=Is_valid([](auto x)->decltype((void)decltype(
-				valueT(x))()) {
-				});
+		//constexpr auto Is_default_constructible_
+			//=Is_valid([](auto x)->decltype((void)decltype(
+				//valueT(x))()) {
+				//});
 
-		/*constexpr auto Is_destructible_
-			=Is_valid([](auto x)->decltype((void)(declval<decltype(
-				valueT(x))>().~decltype(valueT(x))())) {
-				});*/
+		//[>constexpr auto Is_destructible_
+			//=Is_valid([](auto x)->decltype((void)(declval<decltype(
+				//valueT(x))>().~decltype(valueT(x))())) {
+				//});*/
 
-		constexpr auto Is_constructible_
-			=Is_valid([](auto x,auto ...args)->decltype((void)(decltype(
-				valueT(x))(declval<decltype(valueT(args))>()...))) {
-				});
+		//constexpr auto Is_constructible_
+			//=Is_valid([](auto x,auto ...args)->decltype((void)(decltype(
+				//valueT(x))(declval<decltype(valueT(args))>()...))) {
+				//});
 
-		constexpr auto Is_assignable_
-			=Is_valid([](auto x, auto y)->decltype((void)(
-				declval<decltype(valueT(x))>() = declval<decltype(valueT(y))>())) {
-				});
+		//constexpr auto Is_assignable_
+			//=Is_valid([](auto x, auto y)->decltype((void)(
+				//declval<Add_lvalue_reference_t<decltype(valueT(x))>>() = declval<decltype(valueT(y))>())) {
+				//});
 
-		constexpr auto Is_swappable_with_
-			=Is_valid([](auto x, auto y)->decltype((void)(
-				swap(declval<decltype(valueT(x))>(), declval<decltype(valueT(y))>()),
-				swap(declval<decltype(valueT(y))>(), declval<decltype(valueT(x))>()))) {
-				});
-
-
-		template<typename T>
-		struct Is_destructible_Helper {
-		private:
-			//declval<U&>().~U()
-			//express p->~U(),i.e. (*p).~U() requiring p is a lvalue
-			template<typename U, typename=decltype(declval<U&>().~U())>
-			static _true_type test(void*);
-			template<typename>
-			static _false_type test(...);
-		public:
-			using type=decltype(test<T>(nullptr));
-		};
-
-	} //namespace detail
-
-	//type
-	template<typename T>
-	using Is_default_constructible
-		=decltype(detail::Is_default_constructible_(detail::type<T>));
-
-	template<typename T,typename ...Types>
-	using Is_constructible
-		=decltype(detail::Is_constructible_(detail::type<T>,detail::type<Types>...));
-
-	template<typename T>
-	using Is_copy_constructible
-		=Is_constructible<T, T const&>;
-
-	template<typename T>
-	using Is_move_constructible
-		=Is_constructible<T, T&&>;
+		//constexpr auto Is_swappable_with_
+			//=Is_valid([](auto x, auto y)->decltype((void)(
+				//swap(declval<decltype(valueT(x))>(), declval<decltype(valueT(y))>()),
+				//swap(declval<decltype(valueT(y))>(), declval<decltype(valueT(x))>()))) {
+				//});
 
 
-	template<typename T,typename U>
-	using Is_assignable
-		=decltype(detail::Is_assignable_(detail::type<T>, detail::type<U>));
+		//template<typename T>
+		//struct Is_destructible_Helper {
+		//private:
+			////declval<U&>().~U()
+			////express p->~U(),i.e. (*p).~U() requiring p is a lvalue
+			//template<typename U, typename=decltype(declval<U&>().~U())>
+			//static _true_type test(void*);
+			//template<typename>
+			//static _false_type test(...);
+		//public:
+			//using type=decltype(test<T>(nullptr));
+		//};
 
-	template<typename T>
-	using Is_copy_assignable
-		=Is_assignable<T,const T&>;
+	//} //namespace detail
 
-	template<typename T>
-	using Is_move_assignable
-		=Is_assignable<T,T&&>;
+	////type
+	//template<typename T>
+	//using Is_default_constructible
+		//=decltype(detail::Is_default_constructible_(detail::type<T>));
 
-	template<typename T>
-	using Is_destructible
-		=typename detail::Is_destructible_Helper<T>::type;
+	//template<typename T,typename ...Types>
+	//using Is_constructible
+		//=decltype(detail::Is_constructible_(detail::type<T>,detail::type<Types>...));
 
-	template<typename T,typename U>
-	using Is_swappable_with
-		=decltype(detail::Is_swappable_with_(detail::type<T>, detail::type<U>));
+	//template<typename T>
+	//using Is_copy_constructible
+		//=Is_constructible<T, T const&>;
 
-	template<typename T,typename =Void_t<>>
-	struct Is_swappable
-		:_false_type {};
-
-	template<typename T>
-	struct Is_swappable<T, Void_t<T&>>
-		:Is_swappable_with<T&, T&> {};
-
-	//type-nothrow
-	template<typename T,typename =Is_default_constructible<T>>
-	struct Is_nothrow_default_constructible
-		:Bool_constant<noexcept(T{})>{};
-
-	template<typename T>
-	struct Is_nothrow_default_constructible <T, _false_type>
-		:_false_type {};
-
-	template<typename T,typename =Is_destructible<T>>
-	struct Is_nothrow_destructible
-		:Bool_constant<noexcept(declval<T>().~T())> {};
-
-	template<typename T>
-	struct Is_nothrow_destructible<T,_false_type>
-		:_false_type {};
+	//template<typename T>
+	//using Is_move_constructible
+		//=Is_constructible<T, T&&>;
 
 
-    namespace detail{
-        template<bool ,typename T,typename ...Types>
-        struct Is_nothrow_constructible_:_false_type{
-        };
+	//template<typename T,typename U>
+	//using Is_assignable
+		//=decltype(detail::Is_assignable_(detail::type<T>, detail::type<U>));
 
-        template<typename T,typename ...Types>
-        struct Is_nothrow_constructible_<true,T,Types...>
-            :Bool_constant<noexcept(T(declval<Types>()...))>{};
+	//template<typename T>
+	//using Is_copy_assignable
+		//=Is_assignable<T,const T&>;
 
-        template<typename T,typename ...Types>
-        struct Is_nothrow_constructible_helper
-            :Is_nothrow_constructible_<Is_constructible<T,Types...>::value,T,Types...>{
-        };
-    }
+	//template<typename T>
+	//using Is_move_assignable
+		//=Is_assignable<T,T&&>;
 
-	template<typename T,typename ...Types>
-	using Is_nothrow_constructible
-        =typename detail::Is_nothrow_constructible_helper<T, Types...>::type;
+	//template<typename T>
+	//using Is_destructible
+		//=typename detail::Is_destructible_Helper<T>::type;
 
-	template<typename T,typename =Is_copy_constructible<T>>
-	struct Is_nothrow_copy_constructible
-		: Bool_constant<noexcept(T(declval<T const&>()))>{};
+	//template<typename T,typename U>
+	//using Is_swappable_with
+		//=decltype(detail::Is_swappable_with_(detail::type<T>, detail::type<U>));
 
-	template<typename T>
-	struct Is_nothrow_copy_constructible<T, _false_type> 
-		:_false_type{};
+	//template<typename T,typename =Void_t<>>
+	//struct Is_swappable
+		//:_false_type {};
 
-	template<typename T,typename =Is_move_constructible<T>>
-	struct Is_nothrow_move_constructible
-		:Bool_constant<noexcept(T(declval<T&&>()))>{};
+	//template<typename T>
+	//struct Is_swappable<T, Void_t<T&>>
+		//:Is_swappable_with<T&, T&> {};
 
-	template<typename T>
-	struct Is_nothrow_move_constructible<T, _false_type> 
-		:_false_type{};
+	////type-nothrow
+	//template<typename T,typename =Is_default_constructible<T>>
+	//struct Is_nothrow_default_constructible
+		//:Bool_constant<noexcept(T{})>{};
+
+	//template<typename T>
+	//struct Is_nothrow_default_constructible <T, _false_type>
+		//:_false_type {};
+
+	//template<typename T,typename =Is_destructible<T>>
+	//struct Is_nothrow_destructible
+		//:Bool_constant<noexcept(declval<T>().~T())> {};
+
+	//template<typename T>
+	//struct Is_nothrow_destructible<T,_false_type>
+		//:_false_type {};
+
+
+    //namespace detail{
+        //template<bool ,typename T,typename ...Types>
+        //struct Is_nothrow_constructible_:_false_type{
+        //};
+
+        //template<typename T,typename ...Types>
+        //struct Is_nothrow_constructible_<true,T,Types...>
+            //:Bool_constant<noexcept(T(declval<Types>()...))>{};
+
+        //template<typename T,typename ...Types>
+        //struct Is_nothrow_constructible_helper
+            //:Is_nothrow_constructible_<Is_constructible<T,Types...>::value,T,Types...>{
+        //};
+    //}
+
+	//template<typename T,typename ...Types>
+	//using Is_nothrow_constructible
+        //=typename detail::Is_nothrow_constructible_helper<T, Types...>::type;
+
+	//template<typename T,typename =Is_copy_constructible<T>>
+	//struct Is_nothrow_copy_constructible
+		//: Bool_constant<noexcept(T(declval<T const&>()))>{};
+
+	//template<typename T>
+	//struct Is_nothrow_copy_constructible<T, _false_type> 
+		//:_false_type{};
+
+	//template<typename T,typename =Is_move_constructible<T>>
+	//struct Is_nothrow_move_constructible
+		//:Bool_constant<noexcept(T(declval<T&&>()))>{};
+
+	//template<typename T>
+	//struct Is_nothrow_move_constructible<T, _false_type> 
+		//:_false_type{};
 
 	
-	template<typename T, typename U,typename =Is_assignable<T, U>>
-	struct Is_nothrow_assignable
-		:Bool_constant<noexcept(declval<T>()=declval<U>())> {};
+	//template<typename T, typename U,typename =Is_assignable<T, U>>
+	//struct Is_nothrow_assignable
+		//:Bool_constant<noexcept(declval<T&>()=declval<U>())> {};
 
-	template<typename T,typename U>
-	struct Is_nothrow_assignable<T, U,_false_type>
-		:_false_type {};
+	//template<typename T,typename U>
+	//struct Is_nothrow_assignable<T, U,_false_type>
+		//:_false_type {};
 
-	template<typename T,typename =Is_copy_assignable<T>>
-	struct Is_nothrow_copy_assignable
-		:Bool_constant<noexcept(declval<T>()=declval<T const&>())> {};
+	//template<typename T,typename =Is_copy_assignable<T>>
+	//struct Is_nothrow_copy_assignable
+		//:Bool_constant<noexcept(declval<T&>()=declval<T const&>())> {};
 
-	template<typename T>
-	struct Is_nothrow_copy_assignable<T, _false_type>
-		:_false_type {};
+	//template<typename T>
+	//struct Is_nothrow_copy_assignable<T, _false_type>
+		//:_false_type {};
 
-	template<typename T,typename =Is_move_assignable<T>>
-	struct Is_nothrow_move_assignable
-		:Bool_constant<noexcept(declval<T>()=declval<T&&>())> {};
+	//template<typename T,typename =Is_move_assignable<T>>
+	//struct Is_nothrow_move_assignable
+		//:Bool_constant<noexcept(declval<T&>()=declval<T&&>())> {};
 
-	template<typename T>
-	struct Is_nothrow_move_assignable<T, _false_type>
-		:_false_type {};
+	//template<typename T>
+	//struct Is_nothrow_move_assignable<T, _false_type>
+		//:_false_type {};
 
-	template<typename T,typename U,typename =Is_swappable_with<T,U>>
-	struct Is_nothrow_swappable_with
-		: Bool_constant<noexcept(swap(declval<T>(),declval<U>()))
-						&&noexcept(swap(declval<U>(),declval<T>()))>{};
+	//template<typename T,typename U,typename =Is_swappable_with<T,U>>
+	//struct Is_nothrow_swappable_with
+		//: Bool_constant<noexcept(swap(declval<T>(),declval<U>()))
+						//&&noexcept(swap(declval<U>(),declval<T>()))>{};
 
-	template<typename T>
-	struct Is_nothrow_swappable_with<T,_false_type>
-		:_false_type {};
+	//template<typename T>
+	//struct Is_nothrow_swappable_with<T,_false_type>
+		//:_false_type {};
 
-	template<typename T, typename =typename Is_swappable<T>::type>
-	struct Is_nothrow_swappable :
-		Bool_constant<noexcept(swap(declval<T&>(), declval<T&>()))> {};
+	//template<typename T, typename =typename Is_swappable<T>::type>
+	//struct Is_nothrow_swappable :
+		//Bool_constant<noexcept(swap(declval<T&>(), declval<T&>()))> {};
 
-	template<typename T>
-	struct Is_nothrow_swappable<T,_false_type>
-		:_false_type{};
+	//template<typename T>
+	//struct Is_nothrow_swappable<T,_false_type>
+		//:_false_type{};
 
-#elif __cplusplus >= 201103L
+//#elif __cplusplus >= 201103L
 	namespace detail{
 #define Object_SUPPORTED_OPERATION_SFINAE(name, condition) \
 		template<typename T> \
@@ -1193,7 +1274,7 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 		{ };
 		
 		template<typename T, typename U>
-		struct Is_assignableT<T, U, Void_t<decltype(declval<T>().operator=(declval<U>()))>>
+		struct Is_assignableT<T, U, Void_t<decltype(declval<T&>() = declval<U>())>>
 			: _true_type
 		{ };
 		
@@ -1204,29 +1285,8 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 		template<typename T>
 		struct Is_move_assignableT : Is_assignableT<T, T&&>
 		{ };
-		
-		template<typename T, typename U, typename = void>
-		struct Is_swappable_withT : _false_type
-		{ };
 	
-		template<typename T, typename U>
-		struct Is_swappable_withT<T, U, Void_t<
-			decltype(swap(declval<T>(), declval<U>())),
-			decltype(swap(declval<U>(), declval<T>()))
-			>>
-			: _true_type
-		{ };
-		
-		template<typename T>
-		struct Is_swappableT : Is_swappable_withT<T&, T&>
-		{ };
 
-		// Trick: set default typename argument to _true_type
-		// then if the same typename argument in partial specialization also get _true_type, 
-		// because specialization is more "specialized" than primary template
-		// so select it
-		// (but, if two or more partial specializations get same result
-		// maybe trigger fatal error...)
 #define NOTHROW_PARTIAL_SPECIALIZATION(name, condition) \
 		template<typename T, typename = _true_type> \
 		struct Is_nothrow_##name : _false_type {}; \
@@ -1265,7 +1325,7 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 
 		template<typename T, typename U>
 		struct Is_nothrow_assignable_<T, U, _true_type>
-			: Bool_constant<noexcept(declval<T>().operator=(declval<U>()))> {};
+			: Bool_constant<noexcept(declval<T&>() = declval<U>())> {};
 
 		template<typename T, typename U>
 		struct Is_nothrow_assignableT : Is_nothrow_assignable_<T, U, typename Is_assignableT<T, U>::type> {};
@@ -1276,18 +1336,6 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 		template<typename T>
 		struct Is_nothrow_move_assignableT : Is_nothrow_assignableT<T, T&&> {};
 
-		template<typename T, typename U, typename = _true_type>
-		struct Is_nothrow_swappable_withT : _false_type {};
-
-		template<typename T, typename U>
-		struct Is_nothrow_swappable_withT<T, U, typename Is_swappable_withT<T, U>::type>
-			: Bool_constant<
-			noexcept(swap(declval<T>(), declval<U>())) &&
-			noexcept(swap(declval<U>(), declval<T>()))
-			> {};
-
-		template<typename T>
-		struct Is_nothrow_swappableT : Is_nothrow_swappable_withT<T&, T&> {};
 
 	} // namespace detail
 
@@ -1316,11 +1364,6 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 	template<typename T>
 	using Is_move_assignable = detail::Is_move_assignableT<T>;
 	
-	template<typename T, typename U>
-	using Is_swappable_with = detail::Is_swappable_withT<T, U>;
-
-	template<typename T>
-	using Is_swappable = detail::Is_swappableT<T>;
 
 	template<typename T>
 	using Is_nothrow_default_constructible = detail::Is_nothrow_default_constructibleT<T>;
@@ -1346,13 +1389,167 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 	template<typename T>
 	using Is_nothrow_move_assignable = detail::Is_nothrow_move_assignableT<T>;
 
-	template<typename T, typename U>
-	using Is_nothrow_swappable_with = detail::Is_nothrow_swappable_withT<T, U>;
+	// since swap dependent on this	
+	template<typename T>
+	struct Is_swappable;
 
 	template<typename T>
-	using Is_nothrow_swappable = detail::Is_nothrow_swappableT<T>;
+	struct Is_nothrow_swappable;
 
-#endif // __cplusplus > 201703L
+	template<typename T>
+	Enable_if_t<Conjunction<Is_move_constructible<T>,
+				Is_move_assignable<T>>::value>
+	swap(T& x, T& y) 
+	noexcept(Conjunction<Is_nothrow_move_constructible<T>,
+			Is_nothrow_move_assignable<T>>::value);
+
+
+	template<typename T, size_t N>
+	auto swap(T(&x)[N], T(&y)[N])
+	noexcept(Is_nothrow_swappable<T>::value) ->
+		 Enable_if_t<Is_swappable<T>::value>;
+
+	// swap detail
+	namespace detail {
+		template<typename T, typename U, typename = void>
+		struct Is_swappable_withT : _false_type
+		{ };
+	
+		template<typename T, typename U>
+		struct Is_swappable_withT<T, U, Void_t<
+			decltype(swap(declval<T>(), declval<U>())),
+			decltype(swap(declval<U>(), declval<T>()))
+			>>
+			: _true_type
+		{ };
+		
+		// Trick: set default typename argument to _true_type
+		// then if the same typename argument in partial specialization also get _true_type, 
+		// because specialization is more "specialized" than primary template
+		// so select it
+		// (but, if two or more partial specializations get same result
+		// maybe trigger fatal error...)
+		template<typename T, typename U, typename = _true_type>
+		struct Is_nothrow_swappable_withT : _false_type {};
+
+		template<typename T, typename U>
+		struct Is_nothrow_swappable_withT<T, U, typename Is_swappable_withT<T, U>::type>
+			: Bool_constant<
+			noexcept(swap(declval<T>(), declval<U>())) &&
+			noexcept(swap(declval<U>(), declval<T>()))
+			> {};
+	
+	} // namespace detail
+
+	template<typename T>
+	struct Is_trivial : Bool_constant<__is_trivial(T)> {};
+
+	template<typename T>
+	struct Is_trivially_copyable : Bool_constant<__is_trivially_copyable(T)> {};
+
+	template<typename T, typename... Args>
+	struct Is_trivially_constructible
+		: Bool_constant<__is_trivially_constructible(T, Args...)>
+	{ };
+
+	namespace detail {
+
+	template<typename T>
+	struct Is_trivially_default_constructible_
+		: Is_trivially_constructible<T>
+	{ };
+
+	template<typename T, bool = Is_referenceable<T>::value>
+	struct Is_trivially_copy_constructible_
+		: _false_type
+	{ };
+
+	template<typename T>
+	struct Is_trivially_copy_constructible_ <T, true>
+		: Conjunction<Is_copy_constructible<T>, Is_trivially_constructible<T, T const&>>
+	{ };
+
+
+	template<typename T, bool = Is_reference<T>::value>
+	struct Is_trivially_move_constructible_
+		: _false_type
+	{ };
+
+	template<typename T>
+	struct Is_trivially_move_constructible_ <T, true>
+		: Conjunction<Is_move_constructible<T>, Is_trivially_constructible<T, T&&>>
+	{ };
+	
+	} // namespace detail
+
+	template<typename T, typename U>
+	struct Is_trivially_assignable
+		: Bool_constant<__is_trivially_assignable(T, U)>
+	{ };
+
+	namespace detail {
+
+	template<typename T, bool = Is_referenceable<T>::value>
+	struct Is_trivially_copy_assignable_
+		: _false_type
+	{ };
+
+	template<typename T>
+	struct Is_trivially_copy_assignable_ <T, true>
+		: Conjunction<Is_copy_assignable<T>, Is_trivially_assignable<T, T const&>>
+	{ };
+
+	template<typename T, bool = Is_referenceable<T>::value>
+	struct Is_trivially_move_assignable_
+		: _false_type
+	{ };
+
+	template<typename T>
+	struct Is_trivially_move_assignable_ <T, true>
+		: Conjunction<Is_move_assignable<T>, Is_trivially_assignable<T, T&&>>
+	{ };
+
+	} // namespace detail
+
+	template<typename T>
+	struct Is_trivially_default_constructible : detail::Is_trivially_default_constructible_<T>
+	{ };
+
+	template<typename T>
+	struct Is_trivially_copy_constructible : detail::Is_trivially_copy_constructible_<T>
+	{ };
+
+	template<typename T>
+	struct Is_trivially_move_constructible : detail::Is_trivially_move_constructible_<T>
+	{ };
+
+	template<typename T>
+	struct Is_trivially_copy_assignable : detail::Is_trivially_copy_assignable_<T>
+	{ };
+
+
+	template<typename T>
+	struct Is_trivially_move_assignable : detail::Is_trivially_move_assignable_<T>
+	{ };
+
+	template<typename T>
+	struct Is_trivially_destructible
+		: Bool_constant<__has_trivial_destructor(T)>
+	{ };
+
+	template<typename T, typename U>
+	struct Is_swappable_with : detail::Is_swappable_withT<T, U> {};
+
+	template<typename T>
+	struct Is_swappable : Is_swappable_with<T&, T&> {};
+
+	template<typename T, typename U>
+	struct Is_nothrow_swappable_with : detail::Is_nothrow_swappable_withT<T, U> {};
+
+	template<typename T>
+	struct Is_nothrow_swappable : Is_nothrow_swappable_with<T&, T&> {};
+
+//#endif // __cplusplus > 201703L
 
 	////////////////////////
 	///Type relationships///
@@ -1384,31 +1581,6 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 	template<typename from, typename to>
 	using Is_convertible =typename detail::Is_convertible_<from, to>::type;
 
-	namespace detail {
-#if __cplusplus < 201402L
-		template<typename T1, typename T2>
-		struct Is_sameT :_false_type {
-		};
-
-		template<typename T>
-		struct Is_sameT<T, T> :_true_type {
-		};
-		
-#else	
-		//Based on the rule of chiel
-		template<typename T1,typename T2>
-		constexpr bool Is_same_=false;
-
-		template<typename T>
-		constexpr bool Is_same_<T,T> =true;
-
-		template<typename T, typename U>
-		struct Is_sameT : Bool_constant<Is_same_<T, U>> {};
-#endif
-	}
-	
-	template<typename T, typename U>
-	using Is_same = detail::Is_sameT<T, U>;
 
 	namespace detail {
 		template<typename B, typename D, bool =Conjunction<
@@ -1539,18 +1711,6 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 	///Miscellaneous transformation/////
 	////////////////////////////////////
 
-	namespace detail {
-		template<bool B, typename T=void>
-		struct Enable_if_;
-
-		template<typename T>
-		struct Enable_if_ <true, T> {
-			using type=T;
-		};
-	}
-
-	template<bool Cond,typename T=void>
-	using Enable_if_t=typename detail::Enable_if_<Cond,T>::type;
 
 	namespace detail {
 		//if condition bool value is true,select the second template parameter
@@ -1706,19 +1866,34 @@ struct HasMemberT_##Member<T,Void_t<decltype(&T::Member)>>      \
 	constexpr bool Is_volatile_v=Is_volatile<T>::value;
 
 	template<typename T>
-	constexpr bool Is_pod_v=Is_pod<T>::value;
+	constexpr bool Is_trivial_v = Is_trivial<T>::value;
+
+	template<typename T>
+	constexpr bool Is_trivially_copyable_v = Is_trivially_copyable<T>::value;
+
+	template<typename T, typename ...Args>
+	constexpr bool Is_trivially_constructible_v 
+		= Is_trivially_constructible<T, Args...>::value;
 
 	template<typename T>
 	constexpr bool Is_trivially_default_constructible_v
-		=Is_trivially_default_constructible<T>::value;
+		= Is_trivially_default_constructible<T>::value;
 
 	template<typename T>
 	constexpr bool Is_trivially_copy_constructible_v
-		=Is_trivially_copy_constructible<T>::value;
+		= Is_trivially_copy_constructible<T>::value;
 
 	template<typename T>
-	constexpr bool Is_trivially_assignment_v
-		=Is_trivially_assigment<T>::value;
+	constexpr bool Is_trivially_move_constructible_v
+		= Is_trivially_move_constructible<T>::value;
+
+	template<typename T>
+	constexpr bool Is_trivially_copy_assignable_v
+		=Is_trivially_copy_assignable<T>::value;
+
+	template<typename T>
+	constexpr bool Is_trivially_move_assignable_v
+		= Is_trivially_move_assignable<T>::value;
 
 	template<typename T>
 	constexpr bool Is_trivially_destructible_v

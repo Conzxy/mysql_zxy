@@ -33,6 +33,7 @@
 
 #include <cstdint>
 #include "stl_type_traits_base.h"
+#include <typeinfo>
 
 namespace TinySTL {
 	namespace mpl {
@@ -413,7 +414,7 @@ namespace TinySTL {
 				template<typename List>
 				struct Type_At_<List, 0>
 					:Type_identity<Front<List>> {};
-
+				
 			}
 
 			template<typename List, int_ N>
@@ -857,6 +858,21 @@ namespace TinySTL {
 				return detail::PrintValuelist(os, x);
 			}
 
+			template<typename Ostream, typename ...Args, int_... Indices>
+			Ostream& TypelistOutput(Ostream& os, Typelist<Args...>, Valuelist<int_, Indices...>)  {
+				int dummy[] = { ((os << typeid(Type_At<Typelist<Args...>, Indices>).name() << '\n'), 0)... };
+				return os;
+			}
+
+			template<typename Ostream, typename ...Args>
+			Ostream& operator<<(Ostream& os, Typelist<Args...> tl) {
+				return TypelistOutput(os, tl, Make_IndexList<sizeof...(Args)>{});
+			}
+			
+			template<typename Ostream>
+			Ostream& operator<<(Ostream& os, Typelist<> ) {
+				return os;
+			}
 			// template vriable since c++14
 #if __cplusplus >= 201402L
 			template<typename List>
@@ -868,6 +884,7 @@ namespace TinySTL {
 			template<typename TL, typename T>
 			constexpr auto Index_Of_v = Index_Of<TL, T>::value;
 #endif
+
 		}	//namespace TL
 	}	//namespace mpl
 }	//namespace TinySTL

@@ -15,15 +15,11 @@ void ThrowIfNotRequiredFieldCount(PreparedStmt const& stmt, unsigned int fieldco
 
 void ThrowIfNotRequiredParameterCount(PreparedStmt const& stmt, unsigned long parametercount);
 
-void ThrowIfFetchFialed(PreparedStmt const& stmt, int fetchret);
-
-int Fetch(PreparedStmt const& stmt);
-
 void ReFetchTruncCol(
 		PreparedStmt const& stmt, 
 		MysqlBindVector& binds,
-		MysqlBufferVector& buffers
-		);
+		MysqlBufferVector& buffers,
+		MysqlBindLengthVector& lengths);
 
 } // namespace helper
 } // namespace zxy

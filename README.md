@@ -6,7 +6,7 @@ It supports **type deduction** and it's **type safe**.
 ## init
 Use the Mysql class to build connection to mysql server
 ```cpp
-Mysql mysql(host, user, password, db)
+Database mysql(host, user, password, db)
 //port default is 3306
 ```
 Resource holding class use RAII technique, so user no need to destroy them explicitly.
@@ -52,6 +52,10 @@ for(auto const& t : results){
 	else
 		cout << Get<1>(t) << "'s salary is " << Get<3>(t) << endl;
 }
+```
+```cpp
+// insert null value
+mysql.RunModification(stmt, nullptr);
 ```
 
 ## type safe

@@ -7,9 +7,6 @@
 
 #include "stl_move.h"
 #include "config.h"
-#if __cplusplus >= 201402L
-#include <type_traits> // std::is_final
-#endif
 #include "typelist.h"
 #include "utility.h"
 
@@ -48,12 +45,7 @@ namespace TinySTL{
     };*/
 
     template<int_ height, typename T, bool = 
-            TinySTL::Is_class<T>::value
-#if __cplusplus >= 201402L
-				&& ! std::is_final<T>::value>
-#else
-			>
-#endif
+			Conjunction_t<Is_class<T>, Negation<Is_final<T>>>::value>
     class TupleElt;
 
     template<int_ height,typename T>

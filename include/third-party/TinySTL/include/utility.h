@@ -30,24 +30,6 @@ namespace TinySTL{
 		);
 	}
 
-	// swap
-	template<typename T>
-	void swap(T& x, T& y) noexcept
-	{
-		auto tmp = STL_MOVE(x);
-		x = STL_MOVE(y);
-		y = STL_MOVE(tmp);
-	}
-	
-	template<typename T1, typename T2, STL_ENABLE_IF((
-				Conjunction<
-				Is_assignable<T1, T2&&>, 
-				Is_assignable<T2, T1&&>>::value), int)>
-	void swap(T1& x, T2& y) noexcept{
-		auto tmp = STL_MOVE(x);
-		x = STL_MOVE(y);
-		y = STL_MOVE(tmp);
-	}
 
 	template<typename InIter>
 	InIter Next_Iter(InIter iter){

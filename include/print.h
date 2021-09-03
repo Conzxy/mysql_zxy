@@ -38,7 +38,8 @@ Ostream& PrintTuple(Ostream& os, Tuple<Args...> const& t, Valuelist<int_, Indice
 
 template<typename Ostream, typename ...Args>
 Ostream& operator<<(Ostream& os, Tuple<Args...> const& t){
-	return PrintTuple(os, t, Make_IndexList<sizeof...(Args)>{});
+	constexpr int_ sz = static_cast<int_>(sizeof...(Args));
+	return PrintTuple(os, t, Make_IndexList<sz>{});
 }
 
 //template<typename Ostream>

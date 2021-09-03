@@ -1,6 +1,7 @@
 #include "helper.h"
 #include "mysql_stmt.h"
 #include "mysql_exception.h"
+#include "mysql_stmt.h"
 #include <string>
 #include <stdio.h>
 
@@ -9,10 +10,10 @@ namespace zxy {
 namespace helper {
 
 void BindResultAndExec(PreparedStmt const& stmt, MysqlBindVector& binds){
-	if(mysql_stmt_bind_result(stmt.stmt(), binds.data()) != 0)
+	if(stmt.BindResult(binds.data()) != 0)
 		throw MysqlException{stmt.stmt()};
 
-	if(mysql_stmt_execute(stmt.stmt()) != 0)
+	if(stmt.Execute() != 0)
 		throw MysqlException{stmt.stmt()};
 }
 
@@ -51,23 +52,24 @@ void ThrowIfFetchFialed(PreparedStmt const& stmt, int fetchret){
 	}
 }
 
-int Fetch(PreparedStmt const& stmt){
-	return mysql_stmt_fetch(stmt.stmt());
-}
-
-void ReFetchTruncCol(PreparedStmt const& stmt, 
-						MysqlBindVector& binds,
-						MysqlBufferVector& buffers){
+// may have more than 2 rows truncated
+void ReFetchTruncCol(
+	PreparedStmt const& stmt, 
+	MysqlBindVector& binds,
+	MysqlBufferVector& buffers,
+	MysqlBindLengthVector& lengths)
+{
 	MysqlColOffMap col_offs;	
 	for(size_t i = 0; i != binds.size(); ++i){
-		//MYSQL_BIND.length indicates untructcated length after fetch
+		//MYSQL_BIND.length indicates untrunctcated length after fetch
 		//and min{length, buffer_length} indicates actual length 
-		auto untruncated_length = *binds[i].length;
+		auto untruncated_length = lengths[i];
 		auto actual_length = binds[i].buffer_length;
+
 		if(untruncated_length > actual_length){
-			buffers[i].resize(*binds[i].length + 1);
+			buffers[i].resize(untruncated_length + 1);
 			col_offs.emplace_back(i, actual_length);
-			binds[i].buffer = &buffers[i].data()[actual_length];
+			binds[i].buffer = &buffers[i][actual_length];
 			//need check 
 			binds[i].buffer_length = untruncated_length - actual_length;
 		}
@@ -80,14 +82,15 @@ void ReFetchTruncCol(PreparedStmt const& stmt,
 			auto col = col_off.first;
 			auto off = col_off.second;
 			
-			auto bind = binds[col];
+			auto& bind = binds[col];
 			if(mysql_stmt_fetch_column(stmt.stmt(), &bind, col, off) != 0)
 				throw MysqlException{"failed in refetch truncated columns"};
-
-			//reset buffer so that rebind
-			auto buffer = buffers[col];
+			
+			//reset buffer to rebind
+			auto& buffer = buffers[col];
 			bind.buffer = buffer.data();
 			bind.buffer_length = buffer.size();
+
 		}
 
 		if(mysql_stmt_bind_result(stmt.stmt(), binds.data()) != 0)

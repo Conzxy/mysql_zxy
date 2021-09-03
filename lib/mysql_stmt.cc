@@ -7,16 +7,17 @@
 
 namespace zxy {
 
-PreparedStmt::PreparedStmt(MYSQL* connection, char const* query)
+PreparedStmt::PreparedStmt(MYSQL* connection, TinySTL::string_view query)
 	: stmt_(mysql_stmt_init(connection))
 {
-	if(! stmt_){
+	if(!stmt_){
 		throw MysqlException{"mysql_stmt_init: Out of memory"};
 	}
 
-	if(mysql_stmt_prepare(stmt_, query, strlen(query))){
+	if(mysql_stmt_prepare(stmt_, query.data(), query.size())){
 		std::string error = MysqlException::GetServerError(stmt_);
 
+		// because reset not clear
 		if(mysql_stmt_free_result(stmt_))
 			error += "\n failed in mysql_stmt_free_result() ";
 		if(mysql_stmt_close(stmt_))
@@ -25,6 +26,7 @@ PreparedStmt::PreparedStmt(MYSQL* connection, char const* query)
 		throw MysqlException{error};
 	}
 
+	// cache count
 	parameter_count_ = mysql_stmt_param_count(stmt_);
 	field_count_ = mysql_stmt_field_count(stmt_);
 }
@@ -55,6 +57,33 @@ PreparedStmt& PreparedStmt::operator=(PreparedStmt&& rhs) noexcept
 {
 	this->swap(rhs);
 	return *this;
+}
+
+int PreparedStmt::Execute() const noexcept
+{
+	 return mysql_stmt_execute(stmt_);
+}
+
+bool PreparedStmt::Close() noexcept
+{
+	bool ret = mysql_stmt_close(stmt_); 
+	stmt_ = nullptr;
+	return ret;
+}
+
+int PreparedStmt::Fetch() const noexcept
+{
+	return mysql_stmt_fetch(stmt_); 
+}
+
+bool PreparedStmt::BindResult(MYSQL_BIND* binds) const noexcept
+{ 
+	return mysql_stmt_bind_result(stmt_, binds);
+}
+
+int PreparedStmt::StoreEntireResult() const noexcept
+{
+	return mysql_stmt_store_result(stmt_);
 }
 
 void PreparedStmt::swap(PreparedStmt& rhs) noexcept
